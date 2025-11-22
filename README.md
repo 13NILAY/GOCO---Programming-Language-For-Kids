@@ -1,8 +1,4 @@
-Here is a clean, professional, and beginner-friendly **README.md** for your GoCo Programming Language project — **with dedicated placeholders where you can add screenshots**.
 
-You can copy–paste this directly into GitHub.
-
----
 
 # 🟦 GoCo — Programming Language for Kids (10–14)
 
