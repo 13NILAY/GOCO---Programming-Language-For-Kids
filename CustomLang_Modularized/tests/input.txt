@@ -1,0 +1,4 @@
+NUMBER x = 10.
+NUMBER y = 3.
+NUMBER remainder = x % y.
+DISPLAY(remainder).

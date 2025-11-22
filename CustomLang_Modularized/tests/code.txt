@@ -1,0 +1,871 @@
+/* MyLanguageParser.jj */
+options {
+    STATIC = false;
+    LOOKAHEAD = 3;  // Increased from 2 to 3
+    FORCE_LA_CHECK = true;  // Added this option
+}
+
+PARSER_BEGIN(MyLanguageParser)
+
+import java.io.*;
+import java.util.HashMap;
+import java.util.Stack;
+import java.util.ArrayList;
+
+public class MyLanguageParser {
+    @SuppressWarnings("unchecked")
+    private Stack<HashMap<String, Object>> variableStack = new Stack<>();
+    { variableStack.push(new HashMap<>()); }
+    private ArrayList<Runnable> loopBodyStatements = new ArrayList<>();
+
+    private HashMap<String, Object> currentScope() {
+    return variableStack.peek();
+    }
+    private Stack<ConditionState> conditionStack = new Stack<>();
+    
+    private class ConditionState {
+        boolean condition;
+        boolean anyTrue;  // tracks if any condition in the chain was true
+        ConditionState parent;
+        
+        ConditionState(boolean condition, ConditionState parent) {
+            this.condition = condition;
+            this.anyTrue = condition;
+            this.parent = parent;
+        }
+        
+        boolean isExecutable() {
+            return condition && (parent == null || parent.isExecutable());
+        }
+    }
+    
+    private boolean shouldExecute() {
+        return conditionStack.isEmpty() || conditionStack.peek().isExecutable();
+    }
+
+private void executeParsedStatements() throws ParseException {
+    for (Runnable stmt : loopBodyStatements) {
+        if (shouldExecute()) { // ✅ Check current condition state
+            stmt.run();
+        }
+    }
+}
+private boolean evaluateCondition(String condition) throws ParseException {
+    // Resolve variables in the condition (e.g., "i < 3" → "0 < 3")
+    String resolvedCondition = resolveVariablesInCondition(condition);
+    System.out.println("[DEBUG] Resolved condition: " + resolvedCondition);
+
+    // Split into tokens (e.g., "0 < 3" → ["0", "<", "3"])
+    String[] tokens = resolvedCondition.split("\\s+");
+
+    // Handle standalone booleans (e.g., "true")
+    if (tokens.length == 1) {
+        return Boolean.parseBoolean(resolvedCondition);
+    }
+
+    if (tokens.length != 3) {
+        throw new ParseException("Invalid condition format: " + condition);
+    }
+
+    String left = tokens[0];
+    String op = tokens[1];
+    String right = tokens[2];
+
+    double leftVal = resolveVariableOrLiteral(left);
+    double rightVal = resolveVariableOrLiteral(right);
+
+    // Perform comparison
+    switch (op) {
+        case "<": return leftVal < rightVal;
+        case ">": return leftVal > rightVal;
+        case "<=": return leftVal <= rightVal;
+        case ">=": return leftVal >= rightVal;
+        case "==": return Math.abs(leftVal - rightVal) < 0.000001;
+        case "!=": return Math.abs(leftVal - rightVal) >= 0.000001;
+        default: throw new ParseException("Unsupported operator: " + op);
+    }
+}
+private double resolveVariableOrLiteral(String token) throws ParseException {
+    if (currentScope().containsKey(token)) {
+        Object val = currentScope().get(token);
+        return Double.parseDouble(val.toString());
+    } else if (token.matches("-?\\d+(\\.\\d+)?")) {
+        return Double.parseDouble(token);
+    } else {
+        throw new ParseException("Undefined variable or invalid literal: " + token);
+    }
+}
+
+private String resolveVariablesInCondition(String condition) throws ParseException {
+    String[] tokens = condition.split("\\s+");
+    StringBuilder resolved = new StringBuilder();
+
+    for (String token : tokens) {
+        // Check if the token is a variable in the current scope
+        if (currentScope().containsKey(token)) {
+            resolved.append(currentScope().get(token).toString());
+        } else if (token.matches("-?\\d+(\\.\\d+)?|true|false")) {
+            // Treat as literal number or boolean
+            resolved.append(token);
+        } else {
+            throw new ParseException("Undefined variable in condition: " + token);
+        }
+        resolved.append(" ");
+    }
+    return resolved.toString().trim();
+}
+
+private boolean parseCondition(String condition) throws ParseException {
+    // Use your existing logic to parse "0 < 5" into a boolean
+    // (Modify this based on your existing code)
+    return Boolean.parseBoolean(condition);
+}
+
+private void executeUpdate(String update) throws ParseException {
+    String[] parts = update.split("(?<=\\D)(?=\\d)");
+    if (parts.length != 2) {
+        throw new ParseException("Invalid update syntax: " + update);
+    }
+
+    String var = parts[0].replaceAll("[^a-zA-Z]", "");
+    String op = parts[0].replaceAll("[a-zA-Z]", "");
+    double val = Double.parseDouble(parts[1]);
+
+    // Ensure variable is in the CURRENT scope (loop's scope)
+    if (!currentScope().containsKey(var)) {
+        throw new ParseException("Undefined variable in update: " + var);
+    }
+
+    double current = Double.parseDouble(currentScope().get(var).toString());
+    // Apply update to the loop's scope variable
+    switch (op) {
+        case "+=": current += val; break;
+        case "-=": current -= val; break;
+        case "*=": current *= val; break;
+        case "/=": current /= val; break;
+        case "%=": current %= val; break;
+        default: throw new ParseException("Unsupported operator: " + op);
+    }
+    currentScope().put(var, current);
+    System.out.println("[DEBUG] Updated " + var + " = " + current);
+}
+
+    private Object evaluateValue(String value) {
+    if (value.matches("-?\\d+(\\.\\d+)?")) return Double.parseDouble(value);
+    if (value.equals("true") || value.equals("false")) return Boolean.parseBoolean(value);
+    return value;
+    }
+
+    public static void main(String[] args) {
+        if (args.length != 1) {
+            System.err.println("Usage: java MyLanguageParser <filename.goco>");
+            System.exit(1);
+        }
+
+        String filename = args[0];
+        if (!filename.endsWith(".goco")) {
+            System.err.println("Error: File must have .goco extension");
+            System.exit(1);
+        }
+
+        try {
+            FileInputStream fileStream = new FileInputStream(filename);
+            MyLanguageParser parser = new MyLanguageParser(fileStream);
+            System.out.println("Executing " + filename + "...");
+            parser.Program();
+            System.out.println("Program executed successfully!");
+        } catch (FileNotFoundException e) {
+            System.err.println("Error: File '" + filename + "' not found");
+        } catch (ParseException e) {
+            System.err.println("Parsing Error: " + e.getMessage());
+        } catch (Exception e) {
+            System.err.println("Error: " + e.getMessage());
+        }
+    }
+}
+PARSER_END(MyLanguageParser)
+
+SKIP : {
+    " " | "\t" | "\n" | "\r"
+}
+
+SKIP : {
+    < SINGLE_LINE_COMMENT: "\\\\" (~["\n","\r"])* >
+}
+
+SKIP : {
+    < MULTI_LINE_COMMENT: "/*" (~["*"])* ("*" ~["/"])* "*/" >
+}
+
+TOKEN : {
+    < NUMBER_TYPE: "NUMBER" | "number" | "Number" >
+|   < LETTER_TYPE: "LETTER" | "letter" | "Letter" >
+|   < SENTENCE_TYPE: "SENTENCE" | "sentence" | "Sentence" >
+|   < LOGIC_TYPE: "LOGIC" | "logic" | "Logic" >
+|   < TRUE_VAL: "TRUE" | "True" | "true" >
+|   < FALSE_VAL: "FALSE" | "False" | "false" >
+|   < DISPLAY_CMD: "DISPLAY" | "display" | "Display" >
+|   < INPUT_CMD: "INPUT" | "input" | "Input" >
+|   < IF: "if" | "IF" | "If" >
+|   < ELSEIF: "elseif" | "ELSEIF" | "ElseIf" >
+|   < ELSE: "else" | "ELSE" | "Else" >
+|   <LOOP: "loop" | "LOOP" | "Loop">
+|   < PLUS : "+" >
+|   < MINUS : "-" >
+|   < MULTIPLY : "*" >
+|   < DIVIDE : "/" >
+|   < MODULUS : "%" >
+|   < LPAREN : "(" >
+|   < RPAREN : ")" >
+|   < LBRACE : "{" >
+|   < RBRACE : "}" >
+|   < LBRACKET : "[" >
+|   < RBRACKET : "]" >
+|   < DOT : "." >
+|   < ASSIGN : "=" >
+|   < PLUSEQ: "+=" >
+|   < MINUSEQ: "-=" >
+|   < MULTEQ: "*=" >
+|   < DIVEQ: "/=" >
+|   < MODEQ: "%=" >
+|   < ID : ["a"-"z","A"-"Z"] ( ["a"-"z","A"-"Z","0"-"9","_"] )* >
+|   < NUMBER_LITERAL : (["0"-"9"])+ ( "." (["0"-"9"])+ )? >
+|   < CHAR_LITERAL : "'" (~["'"])? "'" >
+|   < STRING_LITERAL : "\"" (~["\""])* "\"" >
+|   < GT: ">" >
+|   < LT: "<" >
+|   < GTE: ">=" >
+|   < LTE: "<=" >
+|   < EQ: "==" >
+|   < NEQ: "!=" >
+|   < AND: "&&" >
+|   < OR: "||" >
+|   < NOT: "!" >
+}
+
+void Program() :
+{}
+{
+    {
+        System.out.println(" Starting Program...");
+    }
+    (
+        LOOKAHEAD(3)
+        Statement()
+    )*
+    <EOF>
+}
+
+void Statement() : {}
+{
+    LOOKAHEAD(3) IfStatement() { loopBodyStatements.add(new Runnable() { public void run() {} }); }
+|   LOOKAHEAD(3) LoopStatement() { loopBodyStatements.add(new Runnable() { public void run() {} }); }
+|   NonControlStatement() { loopBodyStatements.add(new Runnable() { public void run() {} }); }
+}
+
+void NonControlStatement() :
+{}
+{
+    (
+        VarDeclaration() { loopBodyStatements.add(new Runnable() { public void run() {} }); }
+    |   PureDeclaration() { loopBodyStatements.add(new Runnable() { public void run() {} }); }
+    |   Assignment() { loopBodyStatements.add(new Runnable() { public void run() {} }); }
+    |   DisplayStatement() { loopBodyStatements.add(new Runnable() { public void run() {} }); }
+    |   InputStatement() { loopBodyStatements.add(new Runnable() { public void run() {} }); }
+    )
+    <DOT>
+    {
+        if (shouldExecute()) {
+            System.out.println(" Statement properly terminated with full stop.");
+        }
+    }
+}
+
+void IfStatement() :
+{
+    String condition;
+    ConditionState parentState = conditionStack.isEmpty() ? null : conditionStack.peek();
+    ConditionState state;
+}
+{
+    <IF> <LPAREN> condition = RelationalExpression() <RPAREN>
+    <LBRACE>
+    {
+        state = new ConditionState(Boolean.parseBoolean(condition), parentState);
+        conditionStack.push(state);
+        if (shouldExecute()) {
+            System.out.println(" Executing IF block...");
+        }
+    }
+    (
+        LOOKAHEAD(3)
+        Statement()
+    )*
+    <RBRACE>
+    {
+        conditionStack.pop();
+    }
+    (
+        LOOKAHEAD(2)
+        ElseIfBlock(state)
+    )*
+    [
+        ElseBlock(state)
+    ]
+}
+
+void ElseIfBlock(ConditionState prevState) :
+{
+    String condition;
+    ConditionState state;
+}
+{
+    <ELSEIF> <LPAREN> condition = RelationalExpression() <RPAREN>
+    <LBRACE>
+    {
+        state = new ConditionState(!prevState.anyTrue && Boolean.parseBoolean(condition), prevState.parent);
+        if (state.condition) prevState.anyTrue = true;
+        conditionStack.push(state);
+        if (shouldExecute()) {
+            System.out.println(" Executing ELSE IF block...");
+        }
+    }
+    (
+        LOOKAHEAD(3)
+        Statement()
+    )*
+    <RBRACE>
+    {
+        conditionStack.pop();
+    }
+}
+
+void ElseBlock(ConditionState prevState) :
+{
+    ConditionState state;
+}
+{
+    <ELSE>
+    <LBRACE>
+    {
+        state = new ConditionState(!prevState.anyTrue, prevState.parent);
+        conditionStack.push(state);
+        if (shouldExecute()) {
+            System.out.println(" Executing ELSE block...");
+        }
+    }
+    (
+        LOOKAHEAD(3)
+        Statement()
+    )*
+    <RBRACE>
+    {
+        conditionStack.pop();
+    }
+}
+
+String AssignmentUpdate() :
+{
+    Token varName, op;
+    String value;
+}
+{
+    (
+        (varName = <ID> <ASSIGN> value = Value() { return varName.image + "=" + value; })
+    |   (varName = <ID> op = <PLUSEQ> value = Value() { return varName.image + "+=" + value; })
+    |   (varName = <ID> op = <MINUSEQ> value = Value() { return varName.image + "-=" + value; })
+    |   (varName = <ID> op = <MULTEQ> value = Value() { return varName.image + "*=" + value; })
+    |   (varName = <ID> op = <DIVEQ> value = Value() { return varName.image + "/=" + value; })
+    |   (varName = <ID> op = <MODEQ> value = Value() { return varName.image + "%=" + value; })
+    )
+}
+
+void LoopStatement() :
+{
+    Token varType, varName;
+    String initValue, condition, update;
+    HashMap<String, Object> parentScope;
+}
+{
+    <LOOP> "("
+    (varType = <NUMBER_TYPE> | varType = <LOGIC_TYPE> | varType = <SENTENCE_TYPE> | varType = <LETTER_TYPE>)
+    varName = <ID> "=" initValue=Value()
+    ","
+    condition=RelationalExpression()
+    ","
+    update=AssignmentUpdate()
+    ")"
+    "{"
+    (Statement())*
+    {
+        try {
+            // Push a new scope for the loop
+            parentScope = new HashMap<>(currentScope());
+            variableStack.push(new HashMap<>(parentScope)); // ✅ Create a fresh copy
+            currentScope().put(varName.image, evaluateValue(initValue));
+
+            System.out.println("[DEBUG] Entering loop. Initial " + varName.image + " = " + initValue);
+
+            while (true) {
+                // Resolve variables in the condition dynamically
+                boolean condResult = evaluateCondition(condition);
+                System.out.println("[DEBUG] Condition: " + condition + " → " + condResult);
+                if (!condResult) break;
+
+                executeParsedStatements();
+                executeUpdate(update);
+            }
+        } catch (ParseException e) {
+            throw new ParseException("Loop error: " + e.getMessage());
+        } finally {
+            variableStack.pop();
+            loopBodyStatements.clear();
+            System.out.println("[DEBUG] Exited loop");
+        }
+    }
+    "}"
+}
+
+void VarDeclaration() :
+{
+    Token varType, varName;
+    String value;
+}
+{
+    (
+        varType = <NUMBER_TYPE>
+    |   varType = <LETTER_TYPE>
+    |   varType = <SENTENCE_TYPE>
+    |   varType = <LOGIC_TYPE>
+    )
+    varName = <ID>
+    <ASSIGN>
+    value = Value()
+    {
+        currentScope().put(varName.image, value);
+        System.out.println(" Variable Parsed: " + varName.image + " = " + value);
+    }
+}
+
+void PureDeclaration() :
+{
+    Token varType, varName;
+}
+{
+    (
+        varType = <NUMBER_TYPE>
+    |   varType = <LETTER_TYPE>
+    |   varType = <SENTENCE_TYPE>
+    |   varType = <LOGIC_TYPE>
+    )
+    varName = <ID>
+    {
+        String defaultValue;
+        if (varType.image.toUpperCase().startsWith("NUMBER")) {
+            defaultValue = "0";
+        } else if (varType.image.toUpperCase().startsWith("LETTER")) {
+            defaultValue = "' '";
+        } else if (varType.image.toUpperCase().startsWith("LOGIC")) {
+            defaultValue = "false";
+        } else {
+            defaultValue = "\"\"";
+        }
+        currentScope().put(varName.image, defaultValue);
+        System.out.println(" Variable Declared: " + varName.image + " (default value: " + defaultValue + ")");
+    }
+}
+
+String Value() :
+{
+    String result;
+    Token t;
+}
+{
+    (
+        result = RelationalExpression()  // Changed from Expression to RelationalExpression
+    |   t = <CHAR_LITERAL> { result = t.image; }
+    |   t = <STRING_LITERAL> { result = t.image; }
+    |   t = <TRUE_VAL> { result = "true"; }
+    |   t = <FALSE_VAL> { result = "false"; }
+    )
+    { return result; }
+}
+
+String RelationalExpression() :
+{
+    String result;
+}
+{
+    result = OrExpression()
+    { return result; }
+}
+
+String OrExpression() :
+{
+    String left, right;
+}
+{
+    left = AndExpression()
+    (
+        LOOKAHEAD(2)
+        <OR>
+        right = AndExpression()
+        {
+            left = String.valueOf(Boolean.parseBoolean(left) || Boolean.parseBoolean(right));
+        }
+    )*
+    { return left; }
+}
+
+String AndExpression() :
+{
+    String left, right;
+}
+{
+    left = NotExpression()
+    (
+        LOOKAHEAD(2)
+        <AND>
+        right = NotExpression()
+        {
+            left = String.valueOf(Boolean.parseBoolean(left) && Boolean.parseBoolean(right));
+        }
+    )*
+    { return left; }
+}
+
+String NotExpression() :
+{
+    String operand;
+    Token not = null;
+}
+{
+    [not = <NOT>]
+    (
+        <LPAREN> operand = OrExpression() <RPAREN>
+    |
+        operand = ComparisonExpression()
+    )
+    {
+        if (not != null) {
+            return String.valueOf(!Boolean.parseBoolean(operand));
+        }
+        return operand;
+    }
+}
+
+// Changed ComparisonExpression to handle logical values better
+String ComparisonExpression() :
+{
+    String left, right = null;
+    Token op = null;
+}
+{
+    left = Expression()
+    (
+        LOOKAHEAD(2)
+        (
+            op = <GT> | op = <LT> | op = <GTE> | op = <LTE> | op = <EQ> | op = <NEQ>
+        )
+        right = Expression()
+        {
+            left = handleComparisonOp(op, left, right);
+        }
+    )?
+    {
+        // Return the value as is if no comparison operator was used
+        return left;
+    }
+}
+
+private String handleComparisonOp(Token op, String left, String right) :
+{}
+{
+    {
+        // First, check if both are quoted strings or characters
+        if ((left.startsWith("\"") && left.endsWith("\"") && right.startsWith("\"") && right.endsWith("\"")) ||
+            (left.startsWith("'") && left.endsWith("'") && right.startsWith("'") && right.endsWith("'"))) {
+            // Remove quotes for comparison
+            String l = left.substring(1, left.length() - 1);
+            String r = right.substring(1, right.length() - 1);
+            
+            switch(op.kind) {
+                case EQ: return String.valueOf(l.equals(r));
+                case NEQ: return String.valueOf(!l.equals(r));
+                default: throw new ParseException("Invalid operator for string/char comparison");
+            }
+        }
+        
+        // Then try numeric comparison
+        try {
+            double val1 = Double.parseDouble(left);
+            double val2 = Double.parseDouble(right);
+            
+            switch(op.kind) {
+                case GT: return String.valueOf(val1 > val2);
+                case LT: return String.valueOf(val1 < val2);
+                case GTE: return String.valueOf(val1 >= val2);
+                case LTE: return String.valueOf(val1 <= val2);
+                case EQ: return String.valueOf(Math.abs(val1 - val2) < 0.000001);
+                case NEQ: return String.valueOf(Math.abs(val1 - val2) >= 0.000001);
+                default: throw new ParseException("Unknown comparison operator");
+            }
+        } catch (NumberFormatException e) {
+            // If not numbers and not strings/chars, treat as boolean comparison
+            if (left.equals("true") || left.equals("false") || right.equals("true") || right.equals("false")) {
+                boolean val1 = Boolean.parseBoolean(left);
+                boolean val2 = Boolean.parseBoolean(right);
+                
+                switch(op.kind) {
+                    case EQ: return String.valueOf(val1 == val2);
+                    case NEQ: return String.valueOf(val1 != val2);
+                    default: throw new ParseException("Invalid operator for boolean values");
+                }
+            }
+            // If not any of the above, return the value as is
+            return left;
+        }
+    }
+}
+
+private String handleLogicalOp(Token op, String left, String right) :
+{}
+{
+    {
+        boolean val1 = Boolean.parseBoolean(left);
+        boolean val2 = Boolean.parseBoolean(right);
+        boolean result;
+        
+        switch(op.kind) {
+            case AND: result = val1 && val2; break;
+            case OR: result = val1 || val2; break;
+            default: throw new ParseException("Unknown logical operator");
+        }
+        return String.valueOf(result);
+    }
+}
+
+void Assignment() :
+{
+    Token varName, op;
+    String value, currentValue;
+}
+{
+    varName = <ID>
+    (
+        <ASSIGN> 
+        value = Value()
+        {
+            if (shouldExecute()) {
+                // Check if the value is a CHAR_LITERAL or STRING_LITERAL and store it as is
+                if (value.startsWith("'") && value.endsWith("'") || value.startsWith("\"") && value.endsWith("\"")) {
+                    currentScope().put(varName.image, value);
+                } else {
+                    // Otherwise, parse it as a number or boolean
+                    try {
+                        Double.parseDouble(value);
+                        currentScope().put(varName.image, value);
+                    } catch (NumberFormatException e) {
+                        currentScope().put(varName.image, Boolean.toString(Boolean.parseBoolean(value))); // ✅ Fixed
+                    }
+                }
+                System.out.println(" Assignment Parsed: " + varName.image + " = " + value);
+            }
+        }
+    |
+        (
+            op = <PLUSEQ> | op = <MINUSEQ> | op = <MULTEQ> | op = <DIVEQ> | op = <MODEQ>
+        )
+        value = Value()
+        {
+            if (shouldExecute()) {
+                if (!currentScope().containsKey(varName.image)) { // ✅ Fixed
+                    throw new ParseException("Undefined variable: " + varName.image);
+                }
+                currentValue = currentScope().get(varName.image).toString(); // ✅ Fixed
+                double val1 = Double.parseDouble(currentValue);
+                double val2 = Double.parseDouble(value);
+                double result;
+                
+                switch(op.kind) {
+                    case PLUSEQ: result = val1 + val2; break;
+                    case MINUSEQ: result = val1 - val2; break;
+                    case MULTEQ: result = val1 * val2; break;
+                    case DIVEQ: 
+                        if (val2 == 0) throw new ParseException("Division by zero");
+                        result = val1 / val2; 
+                        break;
+                    case MODEQ: 
+                        if (val2 == 0) throw new ParseException("Modulus by zero");
+                        result = val1 % val2; 
+                        break;
+                    default: throw new ParseException("Unknown operator");
+                }
+                currentScope().put(varName.image, String.valueOf(result)); // ✅ Fixed
+                System.out.println(" Assignment Parsed: " + varName.image + " " + op.image + " " + value + " = " + result);
+            }
+        }
+    )
+}
+
+// Modify DisplayStatement to use shouldExecute()
+void DisplayStatement() :
+{
+    String result;
+    Token output;
+    String value;
+}
+{
+    <DISPLAY_CMD> <LPAREN>
+    (
+        LOOKAHEAD(3)
+        result = Expression()  // CHANGED FROM RelationalExpression()
+        {
+            if (shouldExecute()) {
+                // Handle quoted strings
+                if (result.startsWith("\"") || result.startsWith("'")) {
+                    result = result.substring(1, result.length() - 1);
+                }
+                System.out.println(" OUTPUT: " + result);
+            }
+        }
+    |   
+        output = <ID> 
+        {
+            if (shouldExecute()) {
+                if (!currentScope().containsKey(output.image)) {
+                    throw new ParseException("Undefined variable: " + output.image);
+                }
+                value = currentScope().get(output.image).toString();
+                System.out.println(" OUTPUT: " + value.replaceAll("^[\"']|[\"']$", ""));
+            }
+        }
+    |   
+        (output = <STRING_LITERAL> | output = <CHAR_LITERAL>)
+        {
+            if (shouldExecute()) {
+                String outputValue = output.image;
+                outputValue = outputValue.substring(1, outputValue.length() - 1);
+                System.out.println(" OUTPUT: " + outputValue);
+            }
+        }
+    )
+    <RPAREN>
+}
+
+void InputStatement() :
+{
+    Token varName;
+    BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+}
+{
+    <INPUT_CMD> <LPAREN> varName = <ID> <RPAREN>
+    {
+        if (!currentScope().containsKey(varName.image)) { // ✅ Fixed
+            throw new ParseException("Undefined variable: " + varName.image);
+        }
+
+        try {
+            System.out.print(" Enter value for " + varName.image + ": ");
+            String userInput = reader.readLine();
+
+            // Check variable type and store accordingly
+            if (currentScope().get(varName.image).toString().matches("-?\\d+(\\.\\d+)?")) { // ✅ Fixed
+                currentScope().put(varName.image, userInput); // ✅ Fixed
+            } else {
+                currentScope().put(varName.image, "\"" + userInput + "\""); // ✅ Fixed
+            }
+            
+            System.out.println(" Input Received: " + varName.image + " = " + currentScope().get(varName.image)); // ✅ Fixed
+        } catch (IOException e) {
+            System.err.println(" Error: Failed to read input.");
+        }
+    }
+}
+
+
+String Expression() :
+{
+    String result;
+    Token op;
+}
+{
+    result = Term()
+    (
+        LOOKAHEAD(3)
+        (op = <PLUS> | op = <MINUS>)
+        result = handleBinaryOp(op, result, Term())
+    )*
+    { return result; }
+}
+
+String Term() :
+{
+    String result;
+    Token op;
+}
+{
+    result = Factor()
+    (
+        LOOKAHEAD(3)
+        (op = <MULTIPLY> | op = <DIVIDE> | op = <MODULUS>) // ✅ Added MODULUS
+        result = handleBinaryOp(op, result, Factor())
+    )*
+    { return result; }
+}
+
+private String handleBinaryOp(Token op, String left, String right) :
+{}
+{
+    {
+        // Handle string concatenation
+        if (op.kind == PLUS) {
+            boolean isLeftString = left.startsWith("\"") || left.startsWith("'");
+            boolean isRightString = right.startsWith("\"") || right.startsWith("'");
+            
+            if (isLeftString || isRightString) {
+                String leftVal = isLeftString ? left.substring(1, left.length()-1) : left;
+                String rightVal = isRightString ? right.substring(1, right.length()-1) : right;
+                return "\"" + leftVal + rightVal + "\"";
+            }
+        }
+
+        // Numeric operations
+        double val1 = Double.parseDouble(left);
+        double val2 = Double.parseDouble(right);
+        
+        switch(op.kind) {
+            case PLUS: return String.valueOf(val1 + val2);
+            case MINUS: return String.valueOf(val1 - val2);
+            case MULTIPLY: return String.valueOf(val1 * val2);
+            case DIVIDE:
+                if (val2 == 0) throw new ParseException("Division by zero");
+                return String.valueOf(val1 / val2);
+            case MODULUS:
+                if (val2 == 0) throw new ParseException("Modulus by zero");
+                return String.valueOf(val1 % val2);
+            default: throw new ParseException("Unknown operator");
+        }
+    }
+}
+
+String Factor() :
+{
+    Token t;
+    String result;
+}
+{
+    (
+        t = <NUMBER_LITERAL> { result = t.image; }
+    |   t = <STRING_LITERAL> { result = t.image; }  // ADDED
+    |   t = <CHAR_LITERAL> { result = t.image; }    // ADDED
+    |   t = <ID>
+        {
+            if (!currentScope().containsKey(t.image))
+                throw new ParseException("Undefined variable: " + t.image);
+            result = currentScope().get(t.image).toString();
+        }
+    |   <LPAREN> result = Expression() <RPAREN>  
+    )
+    { return result; }
+}

@@ -1,0 +1,1036 @@
+/* MyLanguageParser.jj */
+options {
+    STATIC = false;
+    LOOKAHEAD = 3;
+    FORCE_LA_CHECK = true;
+}
+
+PARSER_BEGIN(MyLanguageParser)
+
+package parser;
+
+import java.io.*;
+import java.util.*;
+import java.util.List;
+
+import ast.nodes.*;
+import ast.arrays.*;
+
+public class MyLanguageParser {
+    public static void main(String[] args) {
+        if (args.length != 1) {
+            System.err.println("Usage: java MyLanguageParser <filename.goco>");
+            System.exit(1);
+        }
+
+        String filename = args[0];
+        if (!filename.endsWith(".goco")) {
+            System.err.println("Error: File must have .goco extension");
+            System.exit(1);
+        }
+
+        try {
+            FileInputStream fileStream = new FileInputStream(filename);
+            MyLanguageParser parser = new MyLanguageParser(fileStream);
+            
+            // Parse the program and get the root AST node
+            CoreNodes.ASTNode programNode = parser.Program();
+
+            // In your main method after parsing:
+            System.out.println("=== Starting Validation ===");
+            CoreNodes.Scope globalScope = new CoreNodes.Scope();
+            programNode.validate(globalScope);
+
+            System.out.println("=== Validation Results ===");
+            System.out.println("Has errors: " + programNode.hasErrors());
+            if (programNode.hasErrors()) {
+                System.err.println("❌ COMPILATION FAILED - Validation Errors:");
+                for (String error : programNode.getErrors()) {
+                    System.err.println("   " + error);
+                }
+                System.err.println("Total errors: " + programNode.getErrors().size());
+                System.exit(1);
+            } else {
+                System.out.println("✅ Validation passed - No errors found");
+                System.out.println("=== Starting Execution ===");
+                programNode.execute();
+            }
+            
+        } catch (FileNotFoundException e) {
+            System.err.println("Error: File '" + filename + "' not found");
+        } catch (ParseException e) {
+            System.err.println("Parsing Error: " + e.getMessage());
+        } catch (Exception e) {
+            System.err.println("Error: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+     private boolean isArrayVariable(String varName) {
+        return ArrayCoreNodes.isArray(varName);
+    }
+}
+PARSER_END(MyLanguageParser)
+
+SKIP : {
+    " " | "\t" | "\n" | "\r"
+}
+
+SKIP : {
+    < SINGLE_LINE_COMMENT: "\\\\" (~["\n","\r"])* >
+}
+
+SKIP : {
+    < MULTI_LINE_COMMENT: "/*" (~["*"])* ("*" ~["/"] (~["*"])* )* "*/" >
+}
+
+TOKEN : {
+    < NUMBER_TYPE: "NUMBER" | "number" | "Number" >
+|   < LETTER_TYPE: "LETTER" | "letter" | "Letter" >
+|   < SENTENCE_TYPE: "SENTENCE" | "sentence" | "Sentence" >
+|   < LOGIC_TYPE: "LOGIC" | "logic" | "Logic" >
+|   < TRUE_VAL: "TRUE" | "True" | "true" >
+|   < FALSE_VAL: "FALSE" | "False" | "false" >
+|   < DO: "do" | "DO" | "Do" >
+|   <LENGTH_FUNC: "LENGTH" | "length" | "Length" >
+|   <PUSH_FUNC: "PUSH" | "push" | "Push" >
+|   <POP_FUNC: "POP" | "pop" | "Pop" >
+|   <NEW: "NEW" | "new" > 
+|   <SET_FUNC: "SET" | "set" | "Set" >
+|   <GET_FUNC: "GET" | "get" | "Get" >
+|   < DISPLAY_CMD: "DISPLAY" | "display" | "Display" >
+|   < DISPLAY_NL_CMD: "DISPLAYNL" | "displaynl" | "DisplayNL" | "Displaynl" >
+|   < INPUT_CMD: "INPUT" | "input" | "Input" >
+|   < IF: "if" | "IF" | "If" >
+|   < ELSEIF: "elseif" | "ELSEIF" | "ElseIf" >
+|   < ELSE: "else" | "ELSE" | "Else" >
+|   < LOOP: "loop" | "LOOP" | "Loop" >
+|   < TILL: "TILL" | "till" | "Till" >
+|   < BREAK: "break" | "BREAK" | "Break" >
+|   < CONTINUE: "continue" | "CONTINUE" | "Continue" >
+|   <SWITCH: ("switch" | "SWITCH" | "Switch") >
+|   <CASE: ("case" | "CASE" | "Case") >
+|   <DEFAULT_KWD: ("default" | "DEFAULT" | "Default") >
+|   < PLUS : "+" >
+|   < MINUS : "-" >
+|   < MULTIPLY : "*" >
+|   < DIVIDE : "/" >
+|   < MODULUS : "%" >
+|   < LPAREN : "(" >
+|   < RPAREN : ")" >
+|   < LBRACE : "{" >
+|   < RBRACE : "}" >
+|   < LBRACKET : "[" >
+|   < RBRACKET : "]" >
+|   < DOT : "." >
+|   < ASSIGN : "=" >
+|   < PLUSEQ: "+=" >
+|   < MINUSEQ: "-=" >
+|   < MULTEQ: "*=" >
+|   < DIVEQ: "/=" >
+|   < MODEQ: "%=" >
+|   < COMMA: "," >
+|   < ID : ( ["a"-"z","A"-"Z","_"] ) ( ["a"-"z","A"-"Z","0"-"9","_"] )* >
+|   < NUMBER_LITERAL : (["0"-"9"])+ ( "." (["0"-"9"])+ )? >
+|   < CHAR_LITERAL : "'" (~["'"])? "'" >
+|   < STRING_LITERAL : "\"" (~["\""])* "\"" >
+|   < GT: ">" >
+|   < LT: "<" >
+|   < GTE: ">=" >
+|   < LTE: "<=" >
+|   < EQ: "==" >
+|   < NEQ: "!=" >
+|   < AND: "&&" >
+|   < OR: "||" >
+|   < NOT: "!" >
+|   < INCREMENT: "++" >
+|   < DECREMENT: "--" >
+}
+
+CoreNodes.ASTNode Program() :
+{
+    CoreNodes.ProgramNode program = new CoreNodes.ProgramNode();
+    CoreNodes.ASTNode statement;
+}
+{
+    (
+        LOOKAHEAD(3)
+        statement = Statement()
+        {
+            program.addStatement(statement);
+        }
+    )*
+    <EOF>
+    {
+        return program;
+    }
+}
+
+CoreNodes.ASTNode Statement() :
+{
+    CoreNodes.ASTNode statement;
+}
+{
+    (
+        LOOKAHEAD(3)
+        statement = IfStatement()
+    |   LOOKAHEAD(2)
+        statement = LoopStatement()
+    |   LOOKAHEAD(2)
+        statement = DoWhileStatement()
+    |   
+        statement = NonControlStatement()
+    |
+        statement = SwitchStatement()  
+    )
+    {
+        return statement;
+    }
+}
+
+CoreNodes.ASTNode IfStatement() :
+{
+    ExpressionNodes.ExpressionNode condition;
+    ConditionalNodes.IfNode ifNode;
+    CoreNodes.ASTNode statement;
+    ConditionalNodes.ElseIfNode elseIfNode;
+    ConditionalNodes.ElseNode elseNode;
+}
+{
+    <IF> <LPAREN> condition = RelationalExpression() <RPAREN>
+    <LBRACE>
+    {
+        ifNode = new ConditionalNodes.IfNode(condition);
+    }
+    (
+        LOOKAHEAD(3)
+        statement = Statement()
+        {
+            ifNode.addStatement(statement);
+        }
+    )*
+    <RBRACE>
+    (
+        LOOKAHEAD(2)
+        elseIfNode = ElseIfBlock()
+        {
+            ifNode.addElseIf(elseIfNode);
+        }
+    )*
+    [
+        elseNode = ElseBlock()
+        {
+            ifNode.setElse(elseNode);
+        }
+    ]
+    {
+        return ifNode;
+    }
+}
+
+ConditionalNodes.ElseIfNode ElseIfBlock() :
+{
+    ExpressionNodes.ExpressionNode condition;
+    ConditionalNodes.ElseIfNode elseIfNode;
+    CoreNodes.ASTNode statement;
+}
+{
+    <ELSEIF> <LPAREN> condition = RelationalExpression() <RPAREN>
+    <LBRACE>
+    {
+        elseIfNode = new ConditionalNodes.ElseIfNode(condition);
+    }
+    (
+        LOOKAHEAD(3)
+        statement = Statement()
+        {
+            elseIfNode.addStatement(statement);
+        }
+    )*
+    <RBRACE>
+    {
+        return elseIfNode;
+    }
+}
+
+ConditionalNodes.ElseNode ElseBlock() :
+{
+    ConditionalNodes.ElseNode elseNode = new ConditionalNodes.ElseNode();
+    CoreNodes.ASTNode statement;
+}
+{
+    <ELSE>
+    <LBRACE>
+    (
+        LOOKAHEAD(3)
+        statement = Statement()
+        {
+            elseNode.addStatement(statement);
+        }
+    )*
+    <RBRACE>
+    {
+        return elseNode;
+    }
+}
+
+CoreNodes.ASTNode DoWhileStatement() :
+{
+    ExpressionNodes.ExpressionNode condition;
+    LoopNodes.DoWhileNode doWhileNode = new LoopNodes.DoWhileNode();
+    CoreNodes.ASTNode statement;
+}
+{
+    <DO> <LBRACE>
+    (
+        LOOKAHEAD(3)
+        statement = Statement()
+        {
+            doWhileNode.addStatement(statement);
+        }
+    )*
+    <RBRACE> <LOOP> <LPAREN> condition = RelationalExpression() <RPAREN> <DOT>
+    {
+        doWhileNode.setCondition(condition);
+        return doWhileNode;
+    }
+}
+
+CoreNodes.ASTNode LoopStatement() :
+{
+    ExpressionNodes.ExpressionNode condition;
+    CoreNodes.ASTNode initialization = null;
+    CoreNodes.ASTNode update = null;
+    LoopNodes.LoopNode loopNode;
+    CoreNodes.ASTNode statement;
+    Token t;
+}
+{
+    <LOOP> <LPAREN> 
+    (
+        LOOKAHEAD((<NUMBER_TYPE> | <LETTER_TYPE> | <SENTENCE_TYPE> | <LOGIC_TYPE>) <ID>)
+        initialization = ForLoopInit() 
+        <TILL> 
+        condition = RelationalExpression() 
+        <COMMA> 
+        update = ForLoopUpdate()
+    |
+        condition = RelationalExpression()
+    )
+    <RPAREN>
+    <LBRACE>
+    {
+        loopNode = new LoopNodes.LoopNode(condition, initialization, update);
+    }
+    (
+        LOOKAHEAD(3)
+        statement = Statement()
+        {
+            loopNode.addStatement(statement);
+        }
+    )*
+    <RBRACE>
+    {
+        return loopNode;
+    }
+}
+
+CoreNodes.ASTNode SwitchStatement() :
+{
+    ExpressionNodes.ExpressionNode switchExpr;
+    List<SwitchNodes.CaseNode> caseNodes = new ArrayList<>();
+    SwitchNodes.CaseNode singleCase;
+    SwitchNodes.DefaultNode defaultNode = null;
+}
+{
+    <SWITCH> <LPAREN> switchExpr = Expression() <RPAREN>
+    <LBRACE>
+        (
+            LOOKAHEAD(3)
+            singleCase = CaseClause() { caseNodes.add(singleCase); }
+        )+
+        [
+            LOOKAHEAD(3)
+            defaultNode = DefaultClause()
+        ]
+    <RBRACE>
+    {
+        return new SwitchNodes.SwitchNode(switchExpr, caseNodes, defaultNode);
+    }
+}
+
+SwitchNodes.CaseNode CaseClause() :
+{
+    ExpressionNodes.ExpressionNode caseExpr;
+    List<CoreNodes.ASTNode> statements = new ArrayList<>();
+    CoreNodes.ASTNode stmt;  // temporary variable
+}
+{
+    <CASE> <LPAREN> caseExpr = Expression() <RPAREN>
+    <LBRACE>
+        (
+            LOOKAHEAD(3)
+            stmt = Statement() { statements.add(stmt); }
+        )*
+    <RBRACE>
+    {
+        return new SwitchNodes.CaseNode(caseExpr, statements);
+    }
+}
+
+SwitchNodes.DefaultNode DefaultClause() :
+{
+    List<CoreNodes.ASTNode> statements = new ArrayList<>();
+    CoreNodes.ASTNode stmt;
+}
+{
+    <DEFAULT_KWD>
+    <LBRACE>
+        (
+            LOOKAHEAD(3)
+            stmt = Statement() { statements.add(stmt); }
+        )*
+    <RBRACE>
+    {
+        return new SwitchNodes.DefaultNode(statements);
+    }
+}
+
+CoreNodes.ASTNode ForLoopInit() :
+{
+    Token varType, varName;
+    ExpressionNodes.ExpressionNode value;
+}
+{
+    (
+        varType = <NUMBER_TYPE>
+    |   varType = <LETTER_TYPE>
+    |   varType = <SENTENCE_TYPE>
+    |   varType = <LOGIC_TYPE>
+    )
+    varName = <ID>
+    <ASSIGN>
+    value = Value()
+    {
+        return new DeclarationNodes.VarDeclarationNode(varType.image, varName.image, value);
+    }
+}
+
+CoreNodes.ASTNode ForLoopUpdate() :
+{
+    Token varName, op;
+    ExpressionNodes.ExpressionNode value;
+}
+{
+    (
+        varName = <ID>
+        (
+            op = <PLUSEQ> | op = <MINUSEQ> | op = <MULTEQ> | op = <DIVEQ> | op = <MODEQ>
+        )
+        value = Value()
+        {
+            return new DeclarationNodes.AssignmentNode(varName.image, op.image, value);
+        }
+    |
+        varName = <ID> <INCREMENT>
+        {
+            return new ExpressionNodes.PostIncrementNode(varName.image);
+        }
+    |
+        varName = <ID> <DECREMENT>
+        {
+            return new ExpressionNodes.PostDecrementNode(varName.image);
+        }
+    |
+        <INCREMENT> varName = <ID>
+        {
+            return new ExpressionNodes.PreIncrementNode(varName.image);
+        }
+    |
+        <DECREMENT> varName = <ID>
+        {
+            return new ExpressionNodes.PreDecrementNode(varName.image);
+        }
+    )
+}
+
+CoreNodes.ASTNode NonControlStatement() :
+{
+    CoreNodes.ASTNode statement;
+    Token t, arrayName, funcName;
+    ExpressionNodes.ExpressionNode index, value;
+}
+{   (
+        LOOKAHEAD((<PUSH_FUNC> | <POP_FUNC> | <SET_FUNC>) <LPAREN>)
+        (
+            funcName = <PUSH_FUNC>
+            <LPAREN>
+            arrayName = <ID>
+            <COMMA>
+            value = Value()
+            <RPAREN>
+            {
+                statement = new ArrayOperationNodes.ArrayPushNode(arrayName.image, value);
+            }
+        |
+            funcName = <POP_FUNC>
+            <LPAREN>
+            t = <ID>
+            <RPAREN>
+            {
+                statement = new ArrayOperationNodes.ArrayPopNode(t.image);
+            }
+        |
+            funcName = <SET_FUNC>
+            <LPAREN>
+            arrayName = <ID>
+            <COMMA>
+            index = Value()
+            <COMMA>
+            value = Value()
+            <RPAREN>
+            {
+                statement = new ArrayOperationNodes.ArraySetNode(arrayName.image, index, value);
+            }
+        )
+    |
+        LOOKAHEAD(2)
+        t = <ID> <INCREMENT>
+        {
+            statement = new DeclarationNodes.IncrementStatementNode(t.image, false);
+        }
+    |
+        LOOKAHEAD(2)
+        t = <ID> <DECREMENT>
+        {
+            statement = new DeclarationNodes.DecrementStatementNode(t.image, false);
+        }
+    |
+        LOOKAHEAD(2)
+        <INCREMENT> t = <ID>
+        {
+            statement = new DeclarationNodes.IncrementStatementNode(t.image, true);
+        }
+    |
+        LOOKAHEAD(2)
+        <DECREMENT> t = <ID>
+        {
+            statement = new DeclarationNodes.DecrementStatementNode(t.image, true);
+        }  
+    |   
+        // Fixed LOOKAHEAD to properly handle array declarations
+        LOOKAHEAD((<NUMBER_TYPE> | <LETTER_TYPE> | <SENTENCE_TYPE> | <LOGIC_TYPE>) [<LBRACKET> <RBRACKET>] <ID> [<ASSIGN>])
+        statement = VarDeclaration()
+    |   LOOKAHEAD((<NUMBER_TYPE> | <LETTER_TYPE> | <SENTENCE_TYPE> | <LOGIC_TYPE>) <ID>)
+        statement = PureDeclaration()
+    |   LOOKAHEAD(3)
+        statement = Assignment()
+    |   statement = DisplayStatement()
+    |   statement = InputStatement()
+    |   t = <BREAK> { statement = new LoopNodes.BreakNode(); }
+    |   t = <CONTINUE> { statement = new LoopNodes.ContinueNode(); }
+    )
+    <DOT>
+    {
+        return new CoreNodes.StatementNode(statement);
+    }
+}
+
+CoreNodes.ASTNode VarDeclaration() :
+{
+    Token varType, varName;
+    ExpressionNodes.ExpressionNode value = null;
+    boolean isArray = false;
+}
+{
+    (
+        varType = <NUMBER_TYPE>
+    |   varType = <LETTER_TYPE>
+    |   varType = <SENTENCE_TYPE>
+    |   varType = <LOGIC_TYPE>
+    )
+    [
+        <LBRACKET> <RBRACKET>
+        { isArray = true; }
+    ]
+    varName = <ID>
+    [
+        <ASSIGN> value = Value()
+    ]
+    {
+        if (isArray) {
+            return new ArrayDeclarationNodes.ArrayDeclarationNode(varType.image, varName.image, value);
+        } else {
+            return new DeclarationNodes.VarDeclarationNode(varType.image, varName.image, value);
+        }
+    }
+}
+
+CoreNodes.ASTNode PureDeclaration() :
+{
+    Token varType, varName;
+}
+{
+    (
+        varType = <NUMBER_TYPE>
+    |   varType = <LETTER_TYPE>
+    |   varType = <SENTENCE_TYPE>
+    |   varType = <LOGIC_TYPE>
+    )
+    varName = <ID>
+    {
+        return new DeclarationNodes.VarDeclarationNode(varType.image, varName.image, null);
+    }
+}
+
+ExpressionNodes.ExpressionNode Value() :
+{
+    ExpressionNodes.ExpressionNode result;
+    Token t, typeToken;
+    ExpressionNodes.ExpressionNode sizeExpr;
+    List<ExpressionNodes.ExpressionNode> elements = new ArrayList<>();
+    ExpressionNodes.ExpressionNode element;
+}
+{
+    (
+        result = RelationalExpression()
+    |   t = <CHAR_LITERAL> { result = new ExpressionNodes.LiteralNode(t.image); }
+    |   t = <STRING_LITERAL> { result = new ExpressionNodes.LiteralNode(t.image); }
+    |   t = <TRUE_VAL> { result = new ExpressionNodes.LiteralNode("true"); }
+    |   t = <FALSE_VAL> { result = new ExpressionNodes.LiteralNode("false"); }
+    |   
+        <LBRACKET>
+        (
+            element = Value()
+            {
+                elements.add(element);
+            }
+            (
+                <COMMA>
+                element = Value()
+                {
+                    elements.add(element);
+                }
+            )*
+        )?
+        <RBRACKET>
+        {
+            result = new ArrayDeclarationNodes.ArrayLiteralNode(elements);
+        }
+    |   
+        <NEW> 
+        (
+            typeToken = <NUMBER_TYPE>
+        |   typeToken = <LETTER_TYPE>
+        |   typeToken = <SENTENCE_TYPE>
+        |   typeToken = <LOGIC_TYPE>
+        )
+        <LBRACKET> sizeExpr = Expression() <RBRACKET>
+        {
+            result = new ArrayDeclarationNodes.DynamicArrayNode(
+                typeToken.image.toUpperCase(), 
+                sizeExpr
+            );
+        }
+    )
+    { return result; }
+}
+
+ExpressionNodes.ExpressionNode RelationalExpression() :
+{
+    ExpressionNodes.ExpressionNode result;
+}
+{
+    result = OrExpression()
+    { return result; }
+}
+
+ExpressionNodes.ExpressionNode OrExpression() :
+{
+    ExpressionNodes.ExpressionNode left, right;
+}
+{
+    left = AndExpression()
+    (
+        LOOKAHEAD(2)
+        <OR>
+        right = AndExpression()
+        {
+            left = new ExpressionNodes.BinaryOperationNode("||", left, right);
+        }
+    )*
+    { return left; }
+}
+
+ExpressionNodes.ExpressionNode AndExpression() :
+{
+    ExpressionNodes.ExpressionNode left, right;
+}
+{
+    left = NotExpression()
+    (
+        LOOKAHEAD(2)
+        <AND>
+        right = NotExpression()
+        {
+            left = new ExpressionNodes.BinaryOperationNode("&&", left, right);
+        }
+    )*
+    { return left; }
+}
+
+ExpressionNodes.ExpressionNode NotExpression() :
+{
+    ExpressionNodes.ExpressionNode operand;
+    Token not = null;
+}
+{
+    [not = <NOT>]
+    (
+        <LPAREN> operand = OrExpression() <RPAREN>
+    |
+        operand = ComparisonExpression()
+    )
+    {
+        if (not != null) {
+            return new ExpressionNodes.UnaryOperationNode("!", operand);
+        }
+        return operand;
+    }
+}
+
+ExpressionNodes.ExpressionNode ComparisonExpression() :
+{
+    ExpressionNodes.ExpressionNode left, right = null;
+    Token op = null;
+}
+{
+    left = Expression()
+    (
+        LOOKAHEAD(2)
+        (
+            op = <GT> | op = <LT> | op = <GTE> | op = <LTE> | op = <EQ> | op = <NEQ>
+        )
+        right = Expression()
+        {
+            left = new ExpressionNodes.BinaryOperationNode(op.image, left, right);
+        }
+    )?
+    {
+        return left;
+    }
+}
+
+CoreNodes.ASTNode Assignment() :
+{
+    Token varName, op, typeToken;
+    ExpressionNodes.ExpressionNode value;
+    ExpressionNodes.ExpressionNode index = null;
+    ExpressionNodes.ExpressionNode sizeExpr;
+}
+{
+    varName = <ID>
+    [
+        <LBRACKET>
+        index = Expression()
+        <RBRACKET>
+    ]
+    (
+        <ASSIGN> 
+        (
+            LOOKAHEAD(<NEW>)
+            <NEW> 
+            (
+                typeToken = <NUMBER_TYPE>
+            |   typeToken = <LETTER_TYPE>
+            |   typeToken = <SENTENCE_TYPE>
+            |   typeToken = <LOGIC_TYPE>
+            )
+            <LBRACKET> sizeExpr = Expression() <RBRACKET>
+            {
+                value = new ArrayDeclarationNodes.DynamicArrayNode(
+                    typeToken.image.toUpperCase(), 
+                    sizeExpr
+                );
+                
+                if (index != null) {
+                    return new ArrayAccessNodes.ArrayElementAssignmentNode(varName.image, index, value);
+                } else {
+                    return new ArrayDeclarationNodes.ArrayAssignmentNode(varName.image, value);
+                }
+            }
+        |
+            value = Value()
+            {
+                if (index != null) {
+                    return new ArrayAccessNodes.ArrayElementAssignmentNode(varName.image, index, value);
+                } else {
+                    // Check if value is an array type and handle accordingly
+                    if (value instanceof ArrayDeclarationNodes.ArrayLiteralNode || 
+                        value instanceof ArrayDeclarationNodes.DynamicArrayNode) {
+                        return new ArrayDeclarationNodes.ArrayAssignmentNode(varName.image, value);
+                    } else {
+                        return new DeclarationNodes.AssignmentNode(varName.image, "=", value);
+                    }
+                }
+            }
+        )
+    |
+        (
+            op = <PLUSEQ> | op = <MINUSEQ> | op = <MULTEQ> | op = <DIVEQ> | op = <MODEQ>
+        )
+        value = Value()
+        {
+            if (index != null) {
+                return new ArrayAccessNodes.ArrayElementCompoundAssignmentNode(varName.image, index, op.image, value);
+            } else {
+                return new DeclarationNodes.AssignmentNode(varName.image, op.image, value);
+            }
+        }
+    )
+}
+
+CoreNodes.ASTNode DisplayStatement() :
+{
+    CoreNodes.ASTNode display;
+    ExpressionNodes.ExpressionNode expr;
+    Token output;
+    boolean withNewline = false;
+    List<Object> displayItems = new ArrayList<>();
+    boolean isLiteral = false;
+}
+{
+    (
+        <DISPLAY_CMD> { withNewline = false; }
+        |
+        <DISPLAY_NL_CMD> { withNewline = true; }
+    )
+    <LPAREN>
+    
+    (
+        LOOKAHEAD(3)
+        expr = RelationalExpression()
+        {
+            displayItems.add(expr);
+            isLiteral = false;
+        }
+    |   
+        output = <ID> 
+        {
+            displayItems.add(output.image);
+            isLiteral = false;
+        }
+    |   
+        (output = <STRING_LITERAL> | output = <CHAR_LITERAL>)
+        {
+            displayItems.add(output.image);
+            isLiteral = true;
+        }
+    )
+    
+    (
+        <COMMA>
+        (
+            LOOKAHEAD(3)
+            expr = RelationalExpression()
+            {
+                displayItems.add(expr);
+                isLiteral = false;
+            }
+        |   
+            output = <ID> 
+            {
+                displayItems.add(output.image);
+                isLiteral = false;
+            }
+        |   
+            (output = <STRING_LITERAL> | output = <CHAR_LITERAL>)
+            {
+                displayItems.add(output.image);
+                isLiteral = true;
+            }
+        )
+    )*
+    
+    <RPAREN>
+    {
+    if (displayItems.size() == 1) {
+        Object item = displayItems.get(0);
+        // Fix for array display
+        if (item instanceof String && ArrayCoreNodes.isArray((String)item)) {
+            if (withNewline) {
+                display = new IONodes.DisplayNLNode(ArrayCoreNodes.formatArrayForDisplay((String)item), false);
+            } else {
+                display = new IONodes.DisplayNode(ArrayCoreNodes.formatArrayForDisplay((String)item), false);
+            }
+        } else if (item instanceof ArrayAccessNodes.ArrayAccessNode) {
+            if (withNewline) {
+                display = new IONodes.DisplayNLNode((ExpressionNodes.ExpressionNode)item);
+            } else {
+                display = new IONodes.DisplayNode((ExpressionNodes.ExpressionNode)item);
+            }
+        } else if (item instanceof String) {
+            if (withNewline) {
+                display = new IONodes.DisplayNLNode((String)item, isLiteral);
+            } else {
+                display = new IONodes.DisplayNode((String)item, isLiteral);
+            }
+        } else {
+            if (withNewline) {
+                display = new IONodes.DisplayNLNode((ExpressionNodes.ExpressionNode)item);
+            } else {
+                display = new IONodes.DisplayNode((ExpressionNodes.ExpressionNode)item);
+            }
+        }
+    } else {
+        if (withNewline) {
+            display = new IONodes.MultiDisplayNLNode(displayItems);
+        } else {
+            display = new IONodes.MultiDisplayNode(displayItems);
+        }
+    }
+    return display;
+    }
+}
+
+CoreNodes.ASTNode InputStatement() :
+{
+    Token varName;
+    ExpressionNodes.ExpressionNode index = null;
+}
+{
+    <INPUT_CMD> <LPAREN> varName = <ID>
+     [
+        <LBRACKET>
+        index = Expression()
+        <RBRACKET>
+    ]
+     <RPAREN>
+     {
+        if (index != null) {
+            return new ArrayAccessNodes.ArrayElementInputNode(varName.image, index);
+        } else {
+            return new IONodes.InputNode(varName.image);
+        }
+    }
+}
+
+ExpressionNodes.ExpressionNode Expression() :
+{
+    ExpressionNodes.ExpressionNode result;
+    Token op;
+    ExpressionNodes.ExpressionNode right;
+}
+{
+    result = Term()
+    (
+        (op = <PLUS> | op = <MINUS>)
+        right = Term()
+        {
+            result = new ExpressionNodes.BinaryOperationNode(op.image, result, right);
+        }
+    )*
+    { return result; }
+}
+
+ExpressionNodes.ExpressionNode Term() :
+{
+    ExpressionNodes.ExpressionNode result;
+    Token op;
+    ExpressionNodes.ExpressionNode right;
+}
+{
+    result = Factor()
+    (
+        (op = <MULTIPLY> | op = <DIVIDE> | op = <MODULUS>)
+        right = Factor()
+        {
+            result = new ExpressionNodes.BinaryOperationNode(op.image, result, right);
+        }
+    )*
+    { return result; }
+}
+
+ExpressionNodes.ExpressionNode Factor() :
+{
+    Token t, funcName, arrayName;
+    ExpressionNodes.ExpressionNode result;
+    ExpressionNodes.ExpressionNode inner;
+    ExpressionNodes.ExpressionNode index = null;
+    ExpressionNodes.ExpressionNode param1 = null;
+}
+{
+    (
+        LOOKAHEAD((<GET_FUNC> | <LENGTH_FUNC>) <LPAREN>)
+        (
+            funcName = <GET_FUNC>
+            <LPAREN>
+            arrayName = <ID>
+            <COMMA>
+            param1 = Expression()
+            <RPAREN>
+            {
+                result = new ArrayOperationNodes.ArrayGetNode(arrayName.image, param1);
+            }
+        |
+            funcName = <LENGTH_FUNC>
+            <LPAREN>
+            arrayName = <ID>
+            <RPAREN>
+            {
+                result = new ArrayOperationNodes.ArrayLengthNode(arrayName.image);
+            }
+        )
+    |
+        // Handle pre-increment and pre-decrement
+        <INCREMENT> t = <ID> 
+        { 
+            result = new ExpressionNodes.PreIncrementNode(t.image); 
+        }
+    |   
+        <DECREMENT> t = <ID> 
+        { 
+            result = new ExpressionNodes.PreDecrementNode(t.image); 
+        }
+    |
+        t = <NUMBER_LITERAL> { result = new ExpressionNodes.LiteralNode(t.image); }
+    |   t = <STRING_LITERAL> {result = new ExpressionNodes.LiteralNode(t.image);}
+    |   t = <CHAR_LITERAL> {result = new ExpressionNodes.LiteralNode(t.image);}
+    |   t = <TRUE_VAL> {result = new ExpressionNodes.LiteralNode("true");}
+    |   t = <FALSE_VAL> {result = new ExpressionNodes.LiteralNode("false");}
+    |   
+        t = <ID>
+        {
+            result = new ExpressionNodes.VariableNode(t.image);
+        }
+        [
+            <LBRACKET>
+            index = Expression()
+            <RBRACKET>
+            {
+                result = new ArrayAccessNodes.ArrayAccessNode(t.image, index);
+            }
+        ]
+        // Handle post-increment and post-decrement
+        (
+            <INCREMENT> 
+            { 
+                result = new ExpressionNodes.PostIncrementNode(t.image); 
+            }
+        |
+            <DECREMENT> 
+            { 
+                result = new ExpressionNodes.PostDecrementNode(t.image); 
+            }
+        )?
+    |   
+        <LPAREN> inner = Expression() <RPAREN>
+        { result = inner; }
+    |   
+        <LBRACE> inner = Expression() <RBRACE>
+        { result = inner; }
+    |   
+        <LBRACKET> inner = Expression() <RBRACKET>
+        { result = inner; }
+    )
+    { return result; }
+}

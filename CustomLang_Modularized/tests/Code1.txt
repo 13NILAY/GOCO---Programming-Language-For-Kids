@@ -1,0 +1,957 @@
+/* MyLanguageParser.jj */
+options {
+    STATIC = false;
+    LOOKAHEAD = 3;
+    FORCE_LA_CHECK = true;
+}
+
+PARSER_BEGIN(MyLanguageParser)
+
+import java.io.*;
+import java.util.*;
+import java.util.List;
+
+import java.util.List;
+
+public class MyLanguageParser {
+    public static void main(String[] args) {
+        if (args.length != 1) {
+            System.err.println("Usage: java MyLanguageParser <filename.goco>");
+            System.exit(1);
+        }
+
+        String filename = args[0];
+        if (!filename.endsWith(".goco")) {
+            System.err.println("Error: File must have .goco extension");
+            System.exit(1);
+        }
+
+        try {
+            FileInputStream fileStream = new FileInputStream(filename);
+            MyLanguageParser parser = new MyLanguageParser(fileStream);
+            
+            // Parse the program and get the root AST node
+            ASTNodes.ASTNode programNode = parser.Program();
+            
+            // Execute the AST
+            programNode.execute();
+            
+        } catch (FileNotFoundException e) {
+            System.err.println("Error: File '" + filename + "' not found");
+        } catch (ParseException e) {
+            System.err.println("Parsing Error: " + e.getMessage());
+        } catch (Exception e) {
+            System.err.println("Error: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+     private boolean isArrayVariable(String varName) {
+        return ASTNodesArray.isArray(varName);
+    }
+}
+PARSER_END(MyLanguageParser)
+
+SKIP : {
+    " " | "\t" | "\n" | "\r"
+}
+
+SKIP : {
+    < SINGLE_LINE_COMMENT: "\\\\" (~["\n","\r"])* >
+}
+
+SKIP : {
+    < MULTI_LINE_COMMENT: "/*" (~["*"])* ("*" ~["/"] (~["*"])* )* "*/" >
+}
+
+TOKEN : {
+    < NUMBER_TYPE: "NUMBER" | "number" | "Number" >
+|   < LETTER_TYPE: "LETTER" | "letter" | "Letter" >
+|   < SENTENCE_TYPE: "SENTENCE" | "sentence" | "Sentence" >
+|   < LOGIC_TYPE: "LOGIC" | "logic" | "Logic" >
+|   < TRUE_VAL: "TRUE" | "True" | "true" >
+|   < FALSE_VAL: "FALSE" | "False" | "false" >
+|    < DO: "do" | "DO" | "Do" >
+|   <LENGTH_FUNC: "LENGTH" | "length" | "Length" >
+|   <PUSH_FUNC: "PUSH" | "push" | "Push" >
+|   <POP_FUNC: "POP" | "pop" | "Pop" >
+|   <SET_FUNC: "SET" | "set" | "Set" >
+|   <GET_FUNC: "GET" | "get" | "Get" >
+|   < DISPLAY_CMD: "DISPLAY" | "display" | "Display" >
+|   < DISPLAY_NL_CMD: "DISPLAYNL" | "displaynl" | "DisplayNL" | "Displaynl" >
+|   < INPUT_CMD: "INPUT" | "input" | "Input" >
+|   < IF: "if" | "IF" | "If" >
+|   < ELSEIF: "elseif" | "ELSEIF" | "ElseIf" >
+|   < ELSE: "else" | "ELSE" | "Else" >
+|   < LOOP: "loop" | "LOOP" | "Loop" >
+|   < TILL: "TILL" | "till" | "Till" >
+|   < BREAK: "break" | "BREAK" | "Break" >
+|   < CONTINUE: "continue" | "CONTINUE" | "Continue" >
+|   < PLUS : "+" >
+|   < MINUS : "-" >
+|   < MULTIPLY : "*" >
+|   < DIVIDE : "/" >
+|   < MODULUS : "%" >
+|   < LPAREN : "(" >
+|   < RPAREN : ")" >
+|   < LBRACE : "{" >
+|   < RBRACE : "}" >
+|   < LBRACKET : "[" >
+|   < RBRACKET : "]" >
+|   < DOT : "." >
+|   < ASSIGN : "=" >
+|   < PLUSEQ: "+=" >
+|   < MINUSEQ: "-=" >
+|   < MULTEQ: "*=" >
+|   < DIVEQ: "/=" >
+|   < MODEQ: "%=" >
+|   < COMMA: "," >
+|   < ID : ["a"-"z","A"-"Z"] ( ["a"-"z","A"-"Z","0"-"9","_"] )* >
+|   < NUMBER_LITERAL : (["0"-"9"])+ ( "." (["0"-"9"])+ )? >
+|   < CHAR_LITERAL : "'" (~["'"])? "'" >
+|   < STRING_LITERAL : "\"" (~["\""])* "\"" >
+|   < GT: ">" >
+|   < LT: "<" >
+|   < GTE: ">=" >
+|   < LTE: "<=" >
+|   < EQ: "==" >
+|   < NEQ: "!=" >
+|   < AND: "&&" >
+|   < OR: "||" >
+|   < NOT: "!" >
+|   < INCREMENT: "++" >
+| < DECREMENT: "--" >    
+}
+
+ASTNodes.ASTNode Program() :
+{
+    ASTNodes.ProgramNode program = new ASTNodes.ProgramNode();
+    ASTNodes.ASTNode statement;
+}
+{
+    (
+        LOOKAHEAD(3)
+        statement = Statement()
+        {
+            program.addStatement(statement);
+        }
+    )*
+    <EOF>
+    {
+        return program;
+    }
+}
+
+ASTNodes.ASTNode Statement() :
+{
+    ASTNodes.ASTNode statement;
+}
+{
+    (
+        LOOKAHEAD(3)
+        statement = IfStatement()
+    |   LOOKAHEAD(2)
+        statement = LoopStatement()
+    |   LOOKAHEAD(2)
+        statement = DoWhileStatement()
+    |   
+        statement = NonControlStatement()
+    )
+    {
+        return statement;
+    }
+}
+
+
+
+
+ASTNodes.ASTNode IfStatement() :
+{
+    ASTNodes.ExpressionNode condition;
+    ASTNodes.IfNode ifNode;
+    ASTNodes.ASTNode statement;
+    ASTNodes.ElseIfNode elseIfNode;
+    ASTNodes.ElseNode elseNode;
+}
+{
+    <IF> <LPAREN> condition = RelationalExpression() <RPAREN>
+    <LBRACE>
+    {
+        ifNode = new ASTNodes.IfNode(condition);
+    }
+    (
+        LOOKAHEAD(3)
+        statement = Statement()
+        {
+            ifNode.addStatement(statement);
+        }
+    )*
+    <RBRACE>
+    (
+        LOOKAHEAD(2)
+        elseIfNode = ElseIfBlock()
+        {
+            ifNode.addElseIf(elseIfNode);
+        }
+    )*
+    [
+        elseNode = ElseBlock()
+        {
+            ifNode.setElse(elseNode);
+        }
+    ]
+    {
+        return ifNode;
+    }
+}
+
+ASTNodes.ElseIfNode ElseIfBlock() :
+{
+    ASTNodes.ExpressionNode condition;
+    ASTNodes.ElseIfNode elseIfNode;
+    ASTNodes.ASTNode statement;
+}
+{
+    <ELSEIF> <LPAREN> condition = RelationalExpression() <RPAREN>
+    <LBRACE>
+    {
+        elseIfNode = new ASTNodes.ElseIfNode(condition);
+    }
+    (
+        LOOKAHEAD(3)
+        statement = Statement()
+        {
+            elseIfNode.addStatement(statement);
+        }
+    )*
+    <RBRACE>
+    {
+        return elseIfNode;
+    }
+}
+
+ASTNodes.ElseNode ElseBlock() :
+{
+    ASTNodes.ElseNode elseNode = new ASTNodes.ElseNode();
+    ASTNodes.ASTNode statement;
+}
+{
+    <ELSE>
+    <LBRACE>
+    (
+        LOOKAHEAD(3)
+        statement = Statement()
+        {
+            elseNode.addStatement(statement);
+        }
+    )*
+    <RBRACE>
+    {
+        return elseNode;
+    }
+}
+ASTNodes.ASTNode DoWhileStatement() :
+{
+    ASTNodes.ExpressionNode condition;
+    ASTNodes.DoWhileNode doWhileNode = new ASTNodes.DoWhileNode();
+    ASTNodes.ASTNode statement;
+}
+{
+    <DO> <LBRACE>
+    (
+        LOOKAHEAD(3)
+        statement = Statement()
+        {
+            doWhileNode.addStatement(statement);
+        }
+    )*
+    <RBRACE> <LOOP> <LPAREN> condition = RelationalExpression() <RPAREN> <DOT>
+    {
+        doWhileNode.setCondition(condition);
+        return doWhileNode;
+    }
+}
+ASTNodes.ASTNode LoopStatement() :
+{
+    ASTNodes.ExpressionNode condition;
+    ASTNodes.ASTNode initialization = null;
+    ASTNodes.ASTNode update = null;
+    ASTNodes.LoopNode loopNode;
+    ASTNodes.ASTNode statement;
+    Token t;
+}
+{
+    <LOOP> <LPAREN> 
+    (
+        LOOKAHEAD((<NUMBER_TYPE> | <LETTER_TYPE> | <SENTENCE_TYPE> | <LOGIC_TYPE>) <ID>)
+        // For loop with initialization, condition, and update
+        initialization = ForLoopInit() 
+        <TILL> 
+        condition = RelationalExpression() 
+        <COMMA> 
+        update = ForLoopUpdate()
+        
+    |
+        // Original while loop with just a condition
+        condition = RelationalExpression()
+    )
+    <RPAREN>
+    <LBRACE>
+    {
+        loopNode = new ASTNodes.LoopNode(condition, initialization, update);
+    }
+    (
+        LOOKAHEAD(3)
+        statement = Statement()
+        {
+            loopNode.addStatement(statement);
+        }
+    )*
+    <RBRACE>
+    {
+        return loopNode;
+    }
+}
+
+// Add new method for parsing the initialization part of for loop
+ASTNodes.ASTNode ForLoopInit() :
+{
+    Token varType, varName;
+    ASTNodes.ExpressionNode value;
+}
+{
+    (
+        varType = <NUMBER_TYPE>
+    |   varType = <LETTER_TYPE>
+    |   varType = <SENTENCE_TYPE>
+    |   varType = <LOGIC_TYPE>
+    )
+    varName = <ID>
+    <ASSIGN>
+    value = Value()
+    {
+        return new ASTNodes.VarDeclarationNode(varType.image, varName.image, value);
+    }
+}
+
+// Updated method for parsing the update part of for loop
+ASTNodes.ASTNode ForLoopUpdate() :
+{
+    Token varName, op;
+    ASTNodes.ExpressionNode value;
+}
+{
+    (
+        // Handle regular compound assignments
+        varName = <ID>
+        (
+            op = <PLUSEQ> | op = <MINUSEQ> | op = <MULTEQ> | op = <DIVEQ> | op = <MODEQ>
+        )
+        value = Value()
+        {
+            return new ASTNodes.AssignmentNode(varName.image, op.image, value);
+        }
+    |
+        // Handle post-increment
+        varName = <ID> <INCREMENT>
+        {
+            return new ASTNodes.PostIncrementNode(varName.image);
+        }
+    |
+        // Handle post-decrement
+        varName = <ID> <DECREMENT>
+        {
+            return new ASTNodes.PostDecrementNode(varName.image);
+        }
+    |
+        // Handle pre-increment
+        <INCREMENT> varName = <ID>
+        {
+            return new ASTNodes.PreIncrementNode(varName.image);
+        }
+    |
+        // Handle pre-decrement
+        <DECREMENT> varName = <ID>
+        {
+            return new ASTNodes.PreDecrementNode(varName.image);
+        }
+    )
+}
+
+// Add support for break and continue statements
+ASTNodes.ASTNode NonControlStatement() :
+{
+     ASTNodes.ASTNode statement;
+    Token t, arrayName, funcName;
+    ASTNodes.ExpressionNode index, value;
+}
+{   (
+          // Handle array functions
+        LOOKAHEAD((<LENGTH_FUNC> | <PUSH_FUNC> | <POP_FUNC> | <SET_FUNC> | <GET_FUNC>) <LPAREN>)
+        (
+            funcName = <LENGTH_FUNC>
+            <LPAREN>
+            t = <ID>
+            <RPAREN>
+            {
+                statement = new ASTNodesArray.ArrayLengthNode(t.image);
+            }
+        |
+            funcName = <PUSH_FUNC>
+            <LPAREN>
+            arrayName = <ID>
+            <COMMA>
+            value = Value()
+            <RPAREN>
+            {
+                statement = new ASTNodesArray.ArrayPushNode(arrayName.image, value);
+            }
+        |
+            funcName = <POP_FUNC>
+            <LPAREN>
+            t = <ID>
+            <RPAREN>
+            {
+                statement = new ASTNodesArray.ArrayPopNode(t.image);
+            }
+        |
+            funcName = <SET_FUNC>
+            <LPAREN>
+            arrayName = <ID>
+            <COMMA>
+            index = Value()
+            <COMMA>
+            value = Value()
+            <RPAREN>
+            {
+                statement = new ASTNodesArray.ArraySetNode(arrayName.image, index, value);
+            }
+        |
+            funcName = <GET_FUNC>
+            <LPAREN>
+            arrayName = <ID>
+            <COMMA>
+            index = Value()
+            <RPAREN>
+            {
+                statement = new ASTNodesArray.ArrayGetNode(arrayName.image, index);
+            }
+        )
+    |
+        // Handle post-increment: i++
+        LOOKAHEAD(2)
+        t = <ID> <INCREMENT>
+        {
+            statement = new ASTNodes.IncrementStatementNode(t.image, false);
+        }
+    |
+        // Handle post-decrement: i--
+        LOOKAHEAD(2)
+        t = <ID> <DECREMENT>
+        {
+            statement = new ASTNodes.DecrementStatementNode(t.image, false);
+        }
+    |
+        // Handle pre-increment: ++i
+        LOOKAHEAD(2)
+        <INCREMENT> t = <ID>
+        {
+            statement = new ASTNodes.IncrementStatementNode(t.image, true);
+        }
+    |
+        // Handle pre-decrement: --i
+        LOOKAHEAD(2)
+        <DECREMENT> t = <ID>
+        {
+            statement = new ASTNodes.DecrementStatementNode(t.image, true);
+        }
+    |   
+        // In NonControlStatement(), add this as a LOOKAHEAD option:
+        LOOKAHEAD((<NUMBER_TYPE> | <LETTER_TYPE> | <SENTENCE_TYPE> | <LOGIC_TYPE>) <LBRACKET> <RBRACKET>)
+        statement = ArrayDeclaration()
+    
+     |   LOOKAHEAD((<NUMBER_TYPE> | <LETTER_TYPE> | <SENTENCE_TYPE> | <LOGIC_TYPE>) <ID> <ASSIGN>)
+        statement = VarDeclaration()
+    |   LOOKAHEAD((<NUMBER_TYPE> | <LETTER_TYPE> | <SENTENCE_TYPE> | <LOGIC_TYPE>) <ID>)
+        statement = PureDeclaration()
+    |   LOOKAHEAD(3)
+        statement = Assignment()
+    |   statement = DisplayStatement()
+    |   statement = InputStatement()
+    |   t = <BREAK> { statement = new ASTNodes.BreakNode(); }
+    |   t = <CONTINUE> { statement = new ASTNodes.ContinueNode(); }
+    )
+    <DOT>
+    {
+        return new ASTNodes.StatementNode(statement);
+    }
+}
+
+ASTNodes.ASTNode VarDeclaration() :
+{
+    Token varType, varName;
+    ASTNodes.ExpressionNode value;
+    List<ASTNodes.ExpressionNode> elements = new ArrayList<>();
+    boolean isArray = false;
+}
+{
+    (
+        varType = <NUMBER_TYPE>
+    |   varType = <LETTER_TYPE>
+    |   varType = <SENTENCE_TYPE>
+    |   varType = <LOGIC_TYPE>
+    )
+    
+    // Check for array declaration syntax
+    (
+        LOOKAHEAD(2)
+        <LBRACKET> <RBRACKET>
+        {
+            isArray = true;
+        }
+    )?
+    
+    varName = <ID>
+    <ASSIGN>
+    
+    // For arrays, parse array initialization
+    (
+        LOOKAHEAD(2)
+        <LBRACKET>
+        (
+            value = Value()
+            {
+                elements.add(value);
+            }
+            (
+                <COMMA>
+                value = Value()
+                {
+                    elements.add(value);
+                }
+            )*
+        )?
+        <RBRACKET>
+        {
+            return new ASTNodesArray.ArrayDeclarationNode(varType.image, varName.image, elements);
+        }
+    |
+        // Regular value assignment
+        value = Value()
+        {
+            if (isArray) {
+                return new ASTNodesArray.ArrayDeclarationNode(varType.image, varName.image, value);
+            } else {
+                return new ASTNodes.VarDeclarationNode(varType.image, varName.image, value);
+            }
+        }
+    )
+}
+ASTNodes.ASTNode ArrayDeclaration() :
+{
+    Token varType, varName;
+    List<ASTNodes.ExpressionNode> elements = new ArrayList<>();
+    ASTNodes.ExpressionNode element;
+}
+{
+    varType = <NUMBER_TYPE> <LBRACKET> <RBRACKET> varName = <ID> <ASSIGN> <LBRACKET>
+    (
+        element = Value()
+        {
+            elements.add(element);
+        }
+        (
+            <COMMA>
+            element = Value()
+            {
+                elements.add(element);
+            }
+        )*
+    )?
+    <RBRACKET>
+    {
+        return new ASTNodesArray.ArrayDeclarationNode(varType.image, varName.image, elements);
+    }
+}
+ASTNodes.ASTNode PureDeclaration() :
+{
+    Token varType, varName;
+}
+{
+    (
+        varType = <NUMBER_TYPE>
+    |   varType = <LETTER_TYPE>
+    |   varType = <SENTENCE_TYPE>
+    |   varType = <LOGIC_TYPE>
+    )
+    varName = <ID>
+    {
+        return new ASTNodes.VarDeclarationNode(varType.image, varName.image, null);
+    }
+}
+
+ASTNodes.ExpressionNode Value() :
+{
+    ASTNodes.ExpressionNode result;
+    Token t;
+}
+{
+    (
+        result = RelationalExpression()
+    |   t = <CHAR_LITERAL> { result = new ASTNodes.LiteralNode(t.image); }
+    |   t = <STRING_LITERAL> { result = new ASTNodes.LiteralNode(t.image); }
+    |   t = <TRUE_VAL> { result = new ASTNodes.LiteralNode("true"); }
+    |   t = <FALSE_VAL> { result = new ASTNodes.LiteralNode("false"); }
+    )
+    { return result; }
+}
+
+ASTNodes.ExpressionNode RelationalExpression() :
+{
+    ASTNodes.ExpressionNode result;
+}
+{
+    result = OrExpression()
+    { return result; }
+}
+
+ASTNodes.ExpressionNode OrExpression() :
+{
+    ASTNodes.ExpressionNode left, right;
+}
+{
+    left = AndExpression()
+    (
+        LOOKAHEAD(2)
+        <OR>
+        right = AndExpression()
+        {
+            left = new ASTNodes.BinaryOperationNode("||", left, right);
+        }
+    )*
+    { return left; }
+}
+
+ASTNodes.ExpressionNode AndExpression() :
+{
+    ASTNodes.ExpressionNode left, right;
+}
+{
+    left = NotExpression()
+    (
+        LOOKAHEAD(2)
+        <AND>
+        right = NotExpression()
+        {
+            left = new ASTNodes.BinaryOperationNode("&&", left, right);
+        }
+    )*
+    { return left; }
+}
+
+ASTNodes.ExpressionNode NotExpression() :
+{
+    ASTNodes.ExpressionNode operand;
+    Token not = null;
+}
+{
+    [not = <NOT>]
+    (
+        <LPAREN> operand = OrExpression() <RPAREN>
+    |
+        operand = ComparisonExpression()
+    )
+    {
+        if (not != null) {
+            return new ASTNodes.UnaryOperationNode("!", operand);
+        }
+        return operand;
+    }
+}
+
+ASTNodes.ExpressionNode ComparisonExpression() :
+{
+    ASTNodes.ExpressionNode left, right = null;
+    Token op = null;
+}
+{
+    left = Expression()
+    (
+        LOOKAHEAD(2)
+        (
+            op = <GT> | op = <LT> | op = <GTE> | op = <LTE> | op = <EQ> | op = <NEQ>
+        )
+        right = Expression()
+        {
+            left = new ASTNodes.BinaryOperationNode(op.image, left, right);
+        }
+    )?
+    {
+        return left;
+    }
+}
+
+ASTNodes.ASTNode Assignment() :
+{
+    Token varName, op;
+    ASTNodes.ExpressionNode value;
+     ASTNodes.ExpressionNode index = null;
+}
+{
+    varName = <ID>
+     [
+        // Handle array indexing: arr[index]
+        <LBRACKET>
+        index = Expression()
+        <RBRACKET>
+    ]
+    (
+        <ASSIGN> 
+        value = Value()
+         {
+            if (index != null) {
+                // Array element assignment: arr[index] = value
+                return new ASTNodesArray.ArrayElementAssignmentNode(varName.image, index, value);
+            } else {
+                // Regular assignment
+                return new ASTNodes.AssignmentNode(varName.image, "=", value);
+            }
+        }
+    |
+        (
+            op = <PLUSEQ> | op = <MINUSEQ> | op = <MULTEQ> | op = <DIVEQ> | op = <MODEQ>
+        )
+        value = Value()
+       {
+            if (index != null) {
+                // Array element compound assignment: arr[index] += value
+                return new ASTNodesArray.ArrayElementCompoundAssignmentNode(varName.image, index, op.image, value);
+            } else {
+                // Regular compound assignment
+                return new ASTNodes.AssignmentNode(varName.image, op.image, value);
+            }
+        }
+    )
+}
+
+ASTNodes.ASTNode DisplayStatement() :
+{
+    ASTNodes.ASTNode display;
+    ASTNodes.ExpressionNode expr;
+    Token output;
+    boolean withNewline = false;
+    List<Object> displayItems = new ArrayList<>();
+    boolean isLiteral = false;
+}
+{
+    (
+        <DISPLAY_CMD> { withNewline = false; }
+        |
+        <DISPLAY_NL_CMD> { withNewline = true; }
+    )
+    <LPAREN>
+    
+    // First display item (required)
+    (
+        LOOKAHEAD(3)
+        expr = RelationalExpression()
+        {
+            displayItems.add(expr);
+            isLiteral = false;
+        }
+    |   
+        output = <ID> 
+        {
+            displayItems.add(output.image);
+            isLiteral = false;
+        }
+    |   
+        (output = <STRING_LITERAL> | output = <CHAR_LITERAL>)
+        {
+            displayItems.add(output.image);
+            isLiteral = true;
+        }
+    )
+    
+    // Additional display items (optional)
+    (
+        <COMMA>
+        (
+            LOOKAHEAD(3)
+            expr = RelationalExpression()
+            {
+                displayItems.add(expr);
+                isLiteral = false;
+            }
+        |   
+            output = <ID> 
+            {
+                displayItems.add(output.image);
+                isLiteral = false;
+            }
+        |   
+            (output = <STRING_LITERAL> | output = <CHAR_LITERAL>)
+            {
+                displayItems.add(output.image);
+                isLiteral = true;
+            }
+        )
+    )*
+    
+    <RPAREN>
+    {
+    if (displayItems.size() == 1) {
+        Object item = displayItems.get(0);
+        // In DisplayStatement(), ensure the below condition is properly implemented:
+    if (item instanceof String && ASTNodesArray.isArray((String)item)) {
+        // Handle array display
+        if (withNewline) {
+            display = new ASTNodes.DisplayNLNode(ASTNodesArray.formatArrayForDisplay((String)item), false);
+        } else {
+            display = new ASTNodes.DisplayNode(ASTNodesArray.formatArrayForDisplay((String)item), false);
+        }
+    } else if (item instanceof ASTNodesArray.ArrayAccessNode) {
+            // Handle array element display
+            if (withNewline) {
+                display = new ASTNodes.DisplayNLNode((ASTNodes.ExpressionNode)item);
+            } else {
+                display = new ASTNodes.DisplayNode((ASTNodes.ExpressionNode)item);
+            }
+        } else if (item instanceof String) {
+            if (withNewline) {
+                display = new ASTNodes.DisplayNLNode((String)item, isLiteral);
+            } else {
+                display = new ASTNodes.DisplayNode((String)item, isLiteral);
+            }
+        } else {
+            if (withNewline) {
+                display = new ASTNodes.DisplayNLNode((ASTNodes.ExpressionNode)item);
+            } else {
+                display = new ASTNodes.DisplayNode((ASTNodes.ExpressionNode)item);
+            }
+        }
+    } else {
+        // Multiple items display
+        if (withNewline) {
+            display = new ASTNodes.MultiDisplayNLNode(displayItems);
+        } else {
+            display = new ASTNodes.MultiDisplayNode(displayItems);
+        }
+    }
+    return display;
+    }
+}
+
+ASTNodes.ASTNode InputStatement() :
+{
+    Token varName;
+     ASTNodes.ExpressionNode index = null;
+}
+{
+    <INPUT_CMD> <LPAREN> varName = <ID>
+     [
+        // Handle array element input: INPUT(arr[index])
+        <LBRACKET>
+        index = Expression()
+        <RBRACKET>
+    ]
+     <RPAREN>
+     {
+        if (index != null) {
+            return new ASTNodesArray.ArrayElementInputNode(varName.image, index);
+        } else {
+            return new ASTNodes.InputNode(varName.image);
+        }
+    }
+}
+ASTNodes.ExpressionNode Expression() :
+{
+    ASTNodes.ExpressionNode result;
+    Token op;
+    ASTNodes.ExpressionNode right;
+}
+{
+    result = Term()
+    (
+        (op = <PLUS> | op = <MINUS>)
+        right = Term()
+        {
+            result = new ASTNodes.BinaryOperationNode(op.image, result, right);
+        }
+    )*
+    { return result; }
+}
+
+ASTNodes.ExpressionNode Term() :
+{
+    ASTNodes.ExpressionNode result;
+    Token op;
+    ASTNodes.ExpressionNode right;
+}
+{
+    result = Factor()
+    (
+        (op = <MULTIPLY> | op = <DIVIDE> | op = <MODULUS>)
+        right = Factor()
+        {
+            result = new ASTNodes.BinaryOperationNode(op.image, result, right);
+        }
+    )*
+    { return result; }
+}
+ASTNodes.ExpressionNode Factor() :
+{
+    Token t;
+    ASTNodes.ExpressionNode result;
+    ASTNodes.ExpressionNode inner;
+    ASTNodes.ExpressionNode index = null;
+}
+{
+    (
+        // Handle pre-increment and pre-decrement
+        t = <INCREMENT> t = <ID> 
+        { 
+            result = new ASTNodes.PreIncrementNode(t.image); 
+        }
+    |   
+        t = <DECREMENT> t = <ID> 
+        { 
+            result = new ASTNodes.PreDecrementNode(t.image); 
+        }
+    |
+        t = <NUMBER_LITERAL> { result = new ASTNodes.LiteralNode(t.image); }
+        | t = <ID>
+        {
+            result = new ASTNodes.VariableNode(t.image);
+        }
+        [
+            <LBRACKET>
+            index = Expression()
+            <RBRACKET>
+            {
+                result = new ASTNodesArray.ArrayAccessNode(t.image, index);
+            }
+        ]
+        // Handle post-increment and post-decrement
+        (
+            <INCREMENT> 
+            { 
+                result = new ASTNodes.PostIncrementNode(t.image); 
+            }
+        |
+            <DECREMENT> 
+            { 
+                result = new ASTNodes.PostDecrementNode(t.image); 
+            }
+        )?
+    |   
+        <LPAREN> inner = Expression() <RPAREN>
+        { result = inner; }
+    |   
+        <LBRACE> inner = Expression() <RBRACE>
+        { result = inner; }
+    |   
+        <LBRACKET> inner = Expression() <RBRACKET>
+        { result = inner; }
+    )
+    { return result; }
+}

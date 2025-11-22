@@ -1,0 +1,36 @@
+# Ignore compiled Java class files
+*.class
+
+# Ignore JavaCC-generated files (if they are temporary)
+*.jj~
+*.java~
+
+# Ignore IntelliJ IDEA / Eclipse / VS Code project files
+/.idea/
+/*.iml
+/.classpath
+/.project
+/.settings/
+/target/
+/bin/
+/out/
+
+# Ignore Maven and Gradle build files
+/.mvn/
+/.mvn/wrapper/
+/*.jar
+/*.war
+/*.ear
+/.gradle/
+/build/
+
+# Ignore logs and temp files
+*.log
+hs_err_pid*
+*.swp
+*.swo
+*.swn
+
+# Ignore OS-specific files
+.DS_Store
+Thumbs.db

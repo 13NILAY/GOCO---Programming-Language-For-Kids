@@ -1,0 +1,430 @@
+NUMBER x.  \\Declaration 
+x = 10.     \\Initialization
+NUMBER y = 5.   \\Declaration with Initialization
+
+\\ARITHMATIC OPERATION
+
+NUMBER mod = x % y.   \\Modulus
+NUMBER sum = x + y.     \\Adition
+NUMBER diff = x - y.    \\Subtarction
+NUMBER mul = x * y.     \\Multiplication
+NUMBER div = x / y .    \\Division
+
+display(sum).
+display(diff).
+display(div).
+display(mul).
+DISPLAY(mod).
+
+display("Nilay") .   \\Displays String inside function
+DISPLAY('M').       \\Displays Letter inside function
+LETTER h.    \\  Letter Declaration 
+h = 'h'.     \\    Letter Initialization
+DISPLAY(h).     \\ Display Letter in terms of variable 
+
+SENTENCE msg = "Hello World".
+DISPLAY(msg).
+\\display(mitansh).       \\Undefined Variable  --->  So program gets stopped
+DISPLAY(1).             \\Displays number 
+
+NUMBER num1 .
+NUMBER num2 .
+SENTENCE name .         \\String Declaration
+LETTER na.               \\Letter Declaration
+
+INPUT(num1).        \\Input Number
+Input(num2).
+input(name).        \\Input Sentence
+input(na).          \\ Input Letter
+
+NUMBER sum = num1+ num2.
+\\ This is a single line comment 
+DISPLAY(na).
+DISPLAY(name).
+/* This is 
+    Multiline Comment . */
+DISPLAY(sum).
+
+\\ Calculation test inside display function.
+
+DISPLAY(12 + 13).        \\ Should output 25
+DISPLAY(10 * 5).         \\ Should output 50
+DISPLAY(100 / 20).       \\ Should output 5
+DISPLAY(15 - 7).         \\ Should output 8
+DISPLAY(20 % 7).         \\ Should output 6
+
+NUMBER a = 10.
+NUMBER b = 5.
+DISPLAY(a + b).          \\ Should output 15
+DISPLAY(a * b + 2).      \\ Should output 52 --> Following BODMAS
+
+DISPLAY(12 + 13).                    \\ Function call - only ()
+DISPLAY(10 * [5 + 2]).               \\ Expression can use []
+DISPLAY(100 / {20 + 5}).             \\ Expression can use {}
+DISPLAY((15 - [7 * {2 + 1}])).       \\ Mixed brackets in expression
+
+\\ LOGIC DATATYPE
+
+LOGIC isValid.              \\ Declares with default value false
+LOGIC isTrue = TRUE.        \\ Can use TRUE, True, or true
+LOGIC isFalse = false.      \\ Can use FALSE, False, or false
+DISPLAY(isValid).           \\ Should output: false
+DISPLAY(isTrue).            \\ Should output: true
+DISPLAY(isFalse).           \\ Should output: false
+
+\\ Test variable reassignment
+isValid = True.             \\ Can mix case
+DISPLAY(isValid).           \\ Should output: true
+
+\\ RELATIONAL OPERATORS 
+
+\\ Test relational operators
+ x = 10.
+ y = 5.
+
+LOGIC result1 = x > y.     \\ Should be true
+LOGIC result2 = x < y.     \\ Should be false
+LOGIC result3 = x >= 10.   \\ Should be true
+LOGIC result4 = y <= 5.    \\ Should be true
+LOGIC result5 = x == 10.   \\ Should be true
+LOGIC result6 = y != 5.    \\ Should be false
+
+DISPLAY(result1).  \\  Like this all above results can be displayed
+
+\\ Direct comparison in DISPLAY
+DISPLAY(25 >= {20 + 5}).   \\ Should output true
+
+\\ Test assignment operators
+x = 10.
+y = 5.
+
+x += 5.         \\ x becomes 15
+DISPLAY(x).     \\ Should output 15
+
+x -= 3.         \\ x becomes 12
+DISPLAY(x).     \\ Should output 12
+
+x *= 2.         \\ x becomes 24
+DISPLAY(x).     \\ Should output 24
+
+x /= 4.         \\ x becomes 6
+DISPLAY(x).     \\ Should output 6
+
+x %= 4.         \\ x becomes 2
+DISPLAY(x).     \\ Should output 2
+
+\\ Can also use with expressions
+y += (x * 2).   \\ y becomes 9 (5 + (2 * 2))
+DISPLAY(y).     \\ Should output 9
+
+\\ Works with all bracket types
+x *= [5 + 3].   \\ x becomes 16 (2 * 8)
+DISPLAY(x).     \\ Should output 16
+
+
+
+\\ If , elseif , else  TEST Cases
+
+\\Basic if else
+if(5>6){
+    display(5).
+}else{
+    Display(6).
+}
+
+\\ Complex IF-ELSEIF-ELSE Test Cases
+
+NUMBER score = 75.
+LOGIC hasPassed.
+
+\\ Nested if with multiple conditions
+if(score > 90) {
+    display("Grade A").
+    if(score >= 95) {
+        display("Distinction").
+    } else {
+        display("Merit").
+    }
+} elseif(score > 80) {
+    display("Grade B").
+    if(score >= 85) {
+        display("Upper B").
+    } else {
+        display("Lower B").
+    }
+} elseif(score > 70) {
+    display("Grade C").
+    hasPassed = true.
+    if(score >= 75) {
+        display("Upper C").
+        if(hasPassed) {
+            display("Eligible for advanced course").
+        }
+    } else {
+        display("Lower C").
+    }
+} else {
+    display("Failed").
+    if(score >= 60) {
+        display("Eligible for retest").
+    } else {
+        if(score >= 50) {
+            display("Need improvement").
+        } else {
+            display("Required counseling").
+        }
+    }
+}
+
+
+\\ Testing condition chains with assignments
+NUMBER counter = 0.
+
+if(counter == 0) {
+    counter += 1.
+    display("First block").
+    if(counter == 1) {
+        counter *= 2.
+        display("Inner block 1").
+        if(counter == 2) {
+            counter += 3.
+            display("Deepest block").
+        }
+    }
+} elseif(counter < 5) {
+    counter += 5.
+    display("Second block").
+} elseif(counter < 10) {
+    counter *= 2.
+    display("Third block").
+} else {
+    counter = 0.
+    display("Reset block").
+}
+
+display(counter).  \\ Should show the final value after all operations
+
+
+\\ Testing Logical Operators
+LOGIC a = true.
+LOGIC b = false.
+LOGIC c = true.
+
+\\ AND operator
+DISPLAY(a && b).         \\ Should output: false
+DISPLAY(a && c).         \\ Should output: true
+
+\\ OR operator
+DISPLAY(a || b).         \\ Should output: true
+
+\\ NOT operator
+DISPLAY(!a).             \\ Should output: false
+
+\\ Complex logical expressions
+DISPLAY((a && b) || c).  \\ Should output: true
+DISPLAY((a || b) && !c). \\ Should output: false
+
+\\ Combining with relational operators
+NUMBER x = 5.
+NUMBER y = 10.
+DISPLAY(x < y && a).     \\ Should output: true
+DISPLAY(x > y || c).     \\ Should output: true
+
+\\ Test in if conditions
+if(x < y && a) {
+    DISPLAY("Both conditions true").
+}
+if(x > y || c) {
+    DISPLAY("At least one condition true").
+}
+
+\\ Complex nested conditions
+if((x < y && a) || (x > y && b)) {
+    if(!b && c) {
+        DISPLAYNL("Complex condition met").
+    }
+}
+
+
+DISPLAYNL("Hello", "World", 123).   \\ Comma act as a connector in display function and allow multiple values inside display function
+
+\\  All Above function are working fine.
+
+\\ Loops test Cases 
+\\Complex Expression Test Cases now Working in both for and do while loop 
+Number n=5.
+Number a=2.
+Number b=2.
+loop(Number i=0 TILL i<n ,i+=1) { 
+    Number result =[{(a+b) *((a-i)+b-i)}/2 ].  
+    DISPLAYNL(result).
+}
+displaynl("").
+
+NUMBER x = 8.
+NUMBER y = 4.
+NUMBER i = 1.
+NUMBER result.
+
+loop (i <= 5) {
+    result = {[(x * i) + y] / (i + 1)} % 4.
+    DISPLAYNL("Iteration:", i, "Result:", result).
+    i += 1.
+}
+
+
+\\ While loop
+NUMBER n = 5.
+NUMBER i = 0.
+NUMBER j = 0.
+
+loop(i < n) {
+    NUMBER spaces = n - i - 1.
+    NUMBER stars = 2 * i + 1.
+    
+    j = 0.
+    loop(j < spaces) {
+        DISPLAY(" ").
+        j++.
+    }
+    
+    j = 0.
+    loop(j < stars) {
+        if (j == 0 || j == stars - 1 || i == n - 1) {
+            DISPLAY("*").
+        } else {
+            DISPLAY(" ").
+        }
+        j++.
+    }
+    
+    DISPLAYNL("").
+    i++.
+}
+
+\\for loop
+
+NUMBER n = 5.  \\ Height of the diamond
+
+\\ Upper part of the diamond
+loop(Number i=1 TILL i<=n ,i++) { 
+    loop(Number j=1 TILL j<=n-i ,j++) { 
+        DISPLAY(" ").
+    }
+    loop(Number j=1 TILL j<=2*i-1 ,j++) { 
+        DISPLAY("*").
+    }
+    DISPLAYNL("").  \\ Move to new line
+}
+
+\\ Lower part of the diamond
+loop(Number i=n-1 TILL i>=1 ,i--) { 
+    loop(Number j=1 TILL j<=n-i ,j++) { 
+        DISPLAY(" ").
+    }
+    loop(Number j=1 TILL j<=2*i-1 ,j++) { 
+        DISPLAY("*").
+    }
+    DISPLAYNL("").  \\ Move to new line
+}
+
+\\Do-While
+\\Test Case 1 Basic Do-While-Test
+NUMBER i = 0.
+do {
+    DISPLAYNL(i).
+    i++.
+} loop(i < 5).
+
+\\Do while loop exectes only once
+NUMBER x = 10.
+do {
+    DISPLAYNL("Executed ").
+} loop(x < 0).
+
+\\ Using break inside do-while
+NUMBER i = 1.
+do {
+    DISPLAYNL(i).
+    if (i == 3) {
+        break.
+    }
+    i++.
+} loop(i < 10).
+
+\\ Using continue inside do-while
+NUMBER i = 0.
+do {
+    i++.
+    if (i == 3) {
+        continue.
+    }
+    DISPLAYNL(i).
+} loop(i < 5).
+\\Nesting of do while with diamond pattern
+
+NUMBER n = 5.
+NUMBER i = 1.
+
+\\ Upper Half
+do {
+    NUMBER spaces = n - i+1.
+    NUMBER stars = 2 * i - 1.
+    
+    \\ Print spaces
+    NUMBER j = 1.
+    do {
+        DISPLAY(" ").
+        j++.
+    } loop(j <= spaces).
+    
+    \\ Print stars
+    j = 1.
+    do {
+        DISPLAY("*").
+        j++.
+    } loop(j <= stars).
+
+    DISPLAYNL("").
+    i++.
+} loop(i <= n).
+
+\\ Lower Half
+i = n - 1.
+do {
+    NUMBER spaces = n - i+1.
+    NUMBER stars = 2 * i - 1.
+
+    \\ Print spaces
+    NUMBER j = 1.
+    do {
+        DISPLAY(" ").
+        j++.
+    } loop(j <= spaces).
+
+    \\ Print stars
+    j = 1.
+    do {
+        DISPLAY("*").
+        j++.
+    } loop(j <= stars).
+
+    DISPLAYNL("").
+    i--.
+} loop(i >= 1).
+
+Letter day = 't'.
+
+SWITCH(day) {
+    CASE('m') {
+        DISPLAY("It is Monday").
+    }
+    CASE('s') {
+        DISPLAY("It is Sunday").
+    }
+    DEFAULT {
+        DISPLAY("Not a valid day").
+    }
+}
+
+

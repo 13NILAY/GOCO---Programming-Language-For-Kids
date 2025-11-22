@@ -1,0 +1,13 @@
+Letter day = 't'.
+
+SWITCH(day) {
+    CASE('m') {
+        DISPLAY("It is Monday").
+    }
+    CASE('s') {
+        DISPLAY("It is Sunday").
+    }
+    DEFAULT {
+        DISPLAY("Not a valid day").
+    }
+}

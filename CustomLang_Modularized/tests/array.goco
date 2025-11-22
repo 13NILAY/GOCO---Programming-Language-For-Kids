@@ -1,0 +1,25 @@
+number[] arr = [0,0,0,0,0].
+
+loop(number i=0 till i<5,i+=1)
+{
+    input(arr[i]).
+}
+
+loop(number i=0 till i<5,i+=1)
+{
+    loop(number j=0 till j<i,j+=1)
+    {
+        if(arr[j]>arr[i])
+        {
+            number temp=arr[i].
+            arr[i]=arr[j].
+            arr[j]=temp.
+        }
+    }
+}
+
+displaynl("Sorted array is: ").
+loop(number k=0 till k<5,k+=1)
+{
+    displaynl(arr[k]).
+}
